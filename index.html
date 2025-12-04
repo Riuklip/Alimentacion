@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Alimentación</title>
+    <link rel="stylesheet" href="dist/style.css">
+    <script src="dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🍽️ Sistema de Gestión de Alimentación</h1>
+            <p>Control de dietas y compras para trabajadores - Compatibilidad Excel Completa</p>
+        </header>
+        
+        <div class="instructions">
+            <h3>📋 Instrucciones de uso:</h3>
+            <p>✅ <strong>Importar desde Excel:</strong> Carga tus archivos Excel (.xlsx) directamente</p>
+            <p>✅ <strong>Trabajar:</strong> Realiza todos los cambios necesarios en la aplicación</p>
+            <p>✅ <strong>Exportar a Excel:</strong> Descarga los archivos Excel actualizados</p>
+            <p>✅ <strong>Compatible 100%:</strong> Abre y edita los archivos en Microsoft Excel</p>
+            <p>📌 <strong>Nota:</strong> Los datos se guardan automáticamente en tu navegador</p>
+        </div>
+        
+        <div class="format-info">
+            <strong>📊 Formato Excel requerido:</strong>
+            <p><strong>📄 Trabajadores.xlsx:</strong> Columnas: Nombre, Apellidos, TipoDieta, DiasTrabajados, Meriendas, PrecioMerienda</p>
+            <p><strong>🍎 Alimentos.xlsx:</strong> Columnas: Nombre, Categoria</p>
+            <p><em>💡 Consejo: Descarga las plantillas de Excel para empezar</em></p>
+        </div>
+        
+        <div class="file-controls">
+            <button id="download-template-btn" class="btn-excel">📥 Descargar Plantillas Excel</button>
+            <button id="import-workers-excel-btn" class="btn-excel">📁 Importar Trabajadores (Excel)</button>
+            <button id="import-foods-excel-btn" class="btn-excel">📁 Importar Alimentos (Excel)</button>
+            <button id="export-excel-btn" class="btn-excel">💾 Exportar Todo a Excel</button>
+            <button id="export-summary-excel-btn" class="btn-excel">📊 Exportar Resumen a Excel</button>
+            <button id="export-food-summary-btn" class="btn-excel">📋 Exportar Resumen Alimentos</button>
+            <button id="import-json-btn" class="btn-success">📂 Importar desde JSON</button>
+            <button id="export-json-btn" class="btn-success">💾 Exportar a JSON</button>
+            <button id="reset-data-btn" class="btn-danger">🔄 Restablecer Datos</button>
+            <input type="file" id="import-file" accept=".xlsx,.xls,.json" style="display: none;">
+        </div>
+        
+        <div id="status-message" class="status-message" style="display: none;"></div>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="workers">👥 Trabajadores</div>
+            <div class="tab" data-tab="foods">🍎 Alimentos</div>
+            <div class="tab" data-tab="summary">📊 Resumen</div>
+            <div class="tab" data-tab="excel">📈 Reportes Excel</div>
+        </div>
+        
+        <div class="tab-content active" id="workers-tab">
+            <div class="card">
+                <div class="card-header">
+                    <h2>👥 Gestión de Trabajadores</h2>
+                    <button id="add-worker-btn" class="btn-success">➕ Añadir Trabajador</button>
+                </div>
+                
+                <div class="table-container">
+                    <table id="workers-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Apellidos</th>
+                                <th>Tipo de Alimentación</th>
+                                <th>Días Trabajados</th>
+                                <th>Meriendas</th>
+                                <th>Presupuesto Diario</th>
+                                <th>Presupuesto Total</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workers-list">
+                            <!-- Los trabajadores se cargarán aquí dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="card" id="worker-details" style="display: none;">
+                <div class="card-header">
+                    <h2>👤 Detalles del Trabajador</h2>
+                    <button id="export-worker-excel-btn" class="btn-excel">📊 Exportar a Excel</button>
+                </div>
+                
+                <div id="worker-info">
+                    <!-- Información del trabajador seleccionado -->
+                </div>
+                
+                <h3>🛒 Gestión de Alimentos</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="food-select">Seleccionar Alimento:</label>
+                        <select id="food-select">
+                            <!-- Los alimentos se cargarán aquí dinámicamente -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="food-quantity">Cantidad:</label>
+                        <input type="number" id="food-quantity" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="food-price">Precio Unitario ($):</label>
+                        <input type="number" id="food-price" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="food-store">Tienda:</label>
+                        <select id="food-store">
+                            <option value="kaniki">Kaniki</option>
+                            <option value="punta_brava">Punta Brava</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button id="add-food-btn" class="btn-success">➕ Añadir Alimento</button>
+                    </div>
+                </div>
+                
+                <h3>📋 Lista de Compra</h3>
+                <div class="table-container">
+                    <table id="food-list-table">
+                        <thead>
+                            <tr>
+                                <th>Alimento</th>
+                                <th>Cantidad</th>
+                                <th>Precio Unitario</th>
+                                <th>Subtotal</th>
+                                <th>Tienda</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="food-list">
+                            <!-- Los alimentos del trabajador se cargarán aquí dinámicamente -->
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="3">Total de Alimentos</td>
+                                <td id="food-total">0.00 $</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                
+                <div class="summary">
+                    <div class="summary-item">
+                        <div>💰 Presupuesto Total</div>
+                        <div class="summary-value" id="budget-total">0.00 $</div>
+                    </div>
+                    <div class="summary-item">
+                        <div>🛒 Gasto en Alimentos</div>
+                        <div class="summary-value" id="food-expense">0.00 $</div>
+                    </div>
+                    <div class="summary-item">
+                        <div>💵 Saldo Restante</div>
+                        <div class="summary-value" id="remaining-budget">0.00 $</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="foods-tab">
+            <div class="card">
+                <div class="card-header">
+                    <h2>🍎 Gestión de Alimentos</h2>
+                    <button id="add-food-catalog-btn" class="btn-success">➕ Añadir Alimento</button>
+                </div>
+                
+                <div class="table-container">
+                    <table id="foods-catalog-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Categoría</th>
+                                <th>Precio Promedio</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="foods-catalog-list">
+                            <!-- Los alimentos del catálogo se cargarán aquí dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="summary-tab">
+            <div class="card">
+                <h2>📊 Resumen General</h2>
+                <div class="summary">
+                    <div class="summary-item">
+                        <div>👥 Total Trabajadores</div>
+                        <div class="summary-value" id="total-workers">0</div>
+                    </div>
+                    <div class="summary-item">
+                        <div>💰 Presupuesto Total</div>
+                        <div class="summary-value" id="total-budget">0.00 $</div>
+                    </div>
+                    <div class="summary-item">
+                        <div>🛒 Gasto Total en Alimentos</div>
+                        <div class="summary-value" id="total-food-expense">0.00 $</div>
+                    </div>
+                    <div class="summary-item">
+                        <div>💵 Saldo Total Restante</div>
+                        <div class="summary-value" id="total-remaining">0.00 $</div>
+                    </div>
+                </div>
+                
+                <h3>📈 Desglose por Trabajador</h3>
+                <div class="table-container">
+                    <table id="summary-table">
+                        <thead>
+                            <tr>
+                                <th rowspan="2">Trabajador</th>
+                                <th colspan="4">Detalles del Trabajador</th>
+                                <th colspan="5">Detalles de Alimentos</th>
+                            </tr>
+                            <tr>
+                                <th>Días Trabajados</th>
+                                <th>Meriendas</th>
+                                <th>Presupuesto Total</th>
+                                <th>Saldo Restante</th>
+                                <th>Alimento</th>
+                                <th>Cantidad</th>
+                                <th>Precio Unitario</th>
+                                <th>Subtotal</th>
+                                <th>Tienda</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summary-list">
+                            <!-- El resumen por trabajador se cargará aquí dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="excel-tab">
+            <div class="card">
+                <h2>📈 Reportes y Exportaciones Excel</h2>
+                
+                <div class="excel-features">
+                    <div class="feature-card">
+                        <h3>📥 Importar desde Excel</h3>
+                        <p>Importa tus datos directamente desde archivos Excel (.xlsx)</p>
+                        <div class="feature-buttons">
+                            <button class="btn-excel import-excel-btn" data-type="workers">
+                                📁 Importar Trabajadores
+                            </button>
+                            <button class="btn-excel import-excel-btn" data-type="foods">
+                                📁 Importar Alimentos
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>💾 Exportar a Excel</h3>
+                        <p>Exporta todos los datos en formato Excel profesional</p>
+                        <div class="feature-buttons">
+                            <button class="btn-excel" id="export-full-excel-btn">
+                                📊 Exportar Reporte Completo
+                            </button>
+                            <button class="btn-excel" id="export-detailed-excel-btn">
+                                📋 Exportar Detalles por Trabajador
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>📄 Plantillas Excel</h3>
+                        <p>Descarga plantillas pre-formateadas para facilitar el trabajo</p>
+                        <div class="feature-buttons">
+                            <button class="btn-excel" id="download-workers-template-btn">
+                                📥 Plantilla Trabajadores
+                            </button>
+                            <button class="btn-excel" id="download-foods-template-btn">
+                                📥 Plantilla Alimentos
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="excel-instructions">
+                    <h3>📋 Instrucciones para Excel:</h3>
+                    <ol>
+                        <li><strong>Para importar:</strong> Usa los botones "Importar desde Excel"</li>
+                        <li><strong>Para exportar:</strong> Usa "Exportar a Excel" para obtener los datos actualizados</li>
+                        <li><strong>Para plantillas:</strong> Descarga las plantillas y llénalas con tus datos</li>
+                        <li><strong>Compatible con:</strong> Microsoft Excel 2007+ (.xlsx) y Google Sheets</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para añadir/editar trabajador -->
+    <div id="worker-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="worker-modal-title">➕ Añadir Trabajador</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="worker-form">
+                <input type="hidden" id="worker-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="worker-name">Nombre:</label>
+                        <input type="text" id="worker-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="worker-surname">Apellidos:</label>
+                        <input type="text" id="worker-surname" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="worker-diet">Tipo de Alimentación:</label>
+                    <select id="worker-diet" required>
+                        <option value="normal">Normal (400$/día)</option>
+                        <option value="mejorada">Mejorada (500$/día)</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="worker-days">Días Trabajados:</label>
+                        <input type="number" id="worker-days" min="0" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="worker-snacks">Número de Meriendas:</label>
+                        <input type="number" id="worker-snacks" min="0" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="snack-price">Precio por Merienda ($):</label>
+                        <input type="number" id="snack-price" min="0" step="0.01" value="50" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-success">💾 Guardar Trabajador</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal para añadir alimento al catálogo -->
+    <div id="food-catalog-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="food-catalog-modal-title">➕ Añadir Alimento al Catálogo</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="food-catalog-form">
+                <div class="form-group">
+                    <label for="food-catalog-name">Nombre del Alimento:</label>
+                    <input type="text" id="food-catalog-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="food-catalog-category">Categoría:</label>
+                    <select id="food-catalog-category" required>
+                        <option value="frutas">🍎 Frutas</option>
+                        <option value="verduras">🥦 Verduras</option>
+                        <option value="carnes">🍗 Carnes</option>
+                        <option value="pescados">🐟 Pescados</option>
+                        <option value="lacteos">🥛 Lácteos</option>
+                        <option value="cereales">🌾 Cereales</option>
+                        <option value="bebidas">🥤 Bebidas</option>
+                        <option value="otros">📦 Otros</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-success">💾 Guardar Alimento</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="dist/app.js"></script>
+</body>
+</html>
