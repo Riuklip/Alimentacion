@@ -26,7 +26,7 @@
         <div class="format-info">
             <strong>📊 Formato Excel requerido:</strong>
             <p><strong>📄 Trabajadores.xlsx:</strong> Columnas: Nombre, Apellidos, TipoDieta, DiasTrabajados, Meriendas, PrecioMerienda</p>
-            <p><strong>🍎 Alimentos.xlsx:</strong> Columnas: Nombre, Categoria</p>
+            <p><strong>🍎 Alimentos.xlsx:</strong> Columnas: Nombre, Precio, Tienda</p>
             <p><em>💡 Consejo: Descarga las plantillas de Excel para empezar</em></p>
         </div>
         
@@ -35,15 +35,15 @@
             <button id="import-workers-excel-btn" class="btn-excel">📁 Importar Trabajadores (Excel)</button>
             <button id="import-foods-excel-btn" class="btn-excel">📁 Importar Alimentos (Excel)</button>
             <button id="export-excel-btn" class="btn-excel">💾 Exportar Todo a Excel</button>
-            <button id="export-summary-excel-btn" class="btn-excel">📊 Exportar Resumen a Excel</button>
-            <button id="export-food-summary-btn" class="btn-excel">📋 Exportar Resumen Alimentos</button>
-            <button id="import-json-btn" class="btn-success">📂 Importar desde JSON</button>
-            <button id="export-json-btn" class="btn-success">💾 Exportar a JSON</button>
-            <button id="reset-data-btn" class="btn-danger">🔄 Restablecer Datos</button>
-            <input type="file" id="import-file" accept=".xlsx,.xls,.json" style="display: none;">
+            <button id="export-resumen-pedidos-btn" class="btn-excel">🏢 Resumen Pedidos Empresa</button>
+            <button id="backup-btn" class="btn-info">💾 Exportar Backup</button>
         </div>
         
+        <!-- Input oculto para importar archivos -->
+        <input type="file" id="import-file" accept=".xlsx, .xls" style="display: none;">
+        
         <div id="status-message" class="status-message" style="display: none;"></div>
+        <div id="auto-save-indicator" class="auto-save-indicator" style="display: none;">💾 Guardando automáticamente...</div>
         
         <div class="tabs">
             <div class="tab active" data-tab="workers">👥 Trabajadores</div>
@@ -83,7 +83,6 @@
             <div class="card" id="worker-details" style="display: none;">
                 <div class="card-header">
                     <h2>👤 Detalles del Trabajador</h2>
-                    <button id="export-worker-excel-btn" class="btn-excel">📊 Exportar a Excel</button>
                 </div>
                 
                 <div id="worker-info">
@@ -101,17 +100,6 @@
                     <div class="form-group">
                         <label for="food-quantity">Cantidad:</label>
                         <input type="number" id="food-quantity" min="1" value="1">
-                    </div>
-                    <div class="form-group">
-                        <label for="food-price">Precio Unitario ($):</label>
-                        <input type="number" id="food-price" min="0" step="0.01" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label for="food-store">Tienda:</label>
-                        <select id="food-store">
-                            <option value="kaniki">Kaniki</option>
-                            <option value="punta_brava">Punta Brava</option>
-                        </select>
                     </div>
                     <div class="form-group">
                         <button id="add-food-btn" class="btn-success">➕ Añadir Alimento</button>
@@ -174,8 +162,8 @@
                             <tr>
                                 <th>ID</th>
                                 <th>Nombre</th>
-                                <th>Categoría</th>
-                                <th>Precio Promedio</th>
+                                <th>Precio</th>
+                                <th>Tienda</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
@@ -215,17 +203,15 @@
                         <thead>
                             <tr>
                                 <th rowspan="2">Trabajador</th>
-                                <th colspan="4">Detalles del Trabajador</th>
-                                <th colspan="5">Detalles de Alimentos</th>
+                                <th colspan="3">Detalles del Trabajador</th>
+                                <th colspan="4">Detalles de Alimentos</th>
                             </tr>
                             <tr>
                                 <th>Días Trabajados</th>
-                                <th>Meriendas</th>
                                 <th>Presupuesto Total</th>
                                 <th>Saldo Restante</th>
                                 <th>Alimento</th>
                                 <th>Cantidad</th>
-                                <th>Precio Unitario</th>
                                 <th>Subtotal</th>
                                 <th>Tienda</th>
                             </tr>
@@ -263,21 +249,31 @@
                             <button class="btn-excel" id="export-full-excel-btn">
                                 📊 Exportar Reporte Completo
                             </button>
-                            <button class="btn-excel" id="export-detailed-excel-btn">
-                                📋 Exportar Detalles por Trabajador
+                            <button class="btn-excel" id="export-factura-excel-btn">
+                                🧾 Exportar Factura
                             </button>
                         </div>
                     </div>
                     
                     <div class="feature-card">
-                        <h3>📄 Plantillas Excel</h3>
-                        <p>Descarga plantillas pre-formateadas para facilitar el trabajo</p>
+                        <h3>📄 Listas de Productos</h3>
+                        <p>Descarga listas de productos por tienda</p>
                         <div class="feature-buttons">
-                            <button class="btn-excel" id="download-workers-template-btn">
-                                📥 Plantilla Trabajadores
+                            <button class="btn-excel" id="export-caniki-excel-btn">
+                                🛒 Productos Caniki
                             </button>
-                            <button class="btn-excel" id="download-foods-template-btn">
-                                📥 Plantilla Alimentos
+                            <button class="btn-excel" id="export-puntabrava-excel-btn">
+                                🛒 Productos Punta Brava
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🏢 Resumen para la Empresa</h3>
+                        <p>Exporta un resumen completo de los pedidos realizados</p>
+                        <div class="feature-buttons">
+                            <button class="btn-excel" id="export-resumen-pedidos-btn2">
+                                🏢 Resumen Completo de Pedidos
                             </button>
                         </div>
                     </div>
@@ -287,8 +283,8 @@
                     <h3>📋 Instrucciones para Excel:</h3>
                     <ol>
                         <li><strong>Para importar:</strong> Usa los botones "Importar desde Excel"</li>
-                        <li><strong>Para exportar:</strong> Usa "Exportar a Excel" para obtener los datos actualizados</li>
-                        <li><strong>Para plantillas:</strong> Descarga las plantillas y llénalas con tus datos</li>
+                        <li><strong>Para exportar:</strong> Usa los botones de exportación correspondientes</li>
+                        <li><strong>Formatos específicos:</strong> Cada botón genera un formato específico</li>
                         <li><strong>Compatible con:</strong> Microsoft Excel 2007+ (.xlsx) y Google Sheets</li>
                     </ol>
                 </div>
@@ -341,7 +337,7 @@
         </div>
     </div>
     
-    <!-- Modal para añadir alimento al catálogo -->
+    <!-- Modal para añadir/editar alimento al catálogo -->
     <div id="food-catalog-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -349,28 +345,29 @@
                 <span class="close">&times;</span>
             </div>
             <form id="food-catalog-form">
+                <input type="hidden" id="food-catalog-id">
                 <div class="form-group">
                     <label for="food-catalog-name">Nombre del Alimento:</label>
                     <input type="text" id="food-catalog-name" required>
                 </div>
-                <div class="form-group">
-                    <label for="food-catalog-category">Categoría:</label>
-                    <select id="food-catalog-category" required>
-                        <option value="frutas">🍎 Frutas</option>
-                        <option value="verduras">🥦 Verduras</option>
-                        <option value="carnes">🍗 Carnes</option>
-                        <option value="pescados">🐟 Pescados</option>
-                        <option value="lacteos">🥛 Lácteos</option>
-                        <option value="cereales">🌾 Cereales</option>
-                        <option value="bebidas">🥤 Bebidas</option>
-                        <option value="otros">📦 Otros</option>
-                    </select>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="food-catalog-price">Precio ($):</label>
+                        <input type="number" id="food-catalog-price" min="0" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="food-catalog-store">Tienda:</label>
+                        <select id="food-catalog-store" required>
+                            <option value="kaniki">Kaniki</option>
+                            <option value="punta_brava">Punta Brava</option>
+                        </select>
+                    </div>
                 </div>
                 <button type="submit" class="btn-success">💾 Guardar Alimento</button>
             </form>
         </div>
     </div>
 
-    <script src="dist/app.js"></script>
+    <script src="/dist/app.js"></script>
 </body>
 </html>

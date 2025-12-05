@@ -8,6 +8,9 @@
     --warning-color: #f39c12;
     --excel-color: #217346;
     --info-color: #17a2b8;
+    --kaniki-color: #3498db;
+    --puntabrava-color: #2ecc71;
+    --reset-color: #9b59b6;
 }
 
 * {
@@ -212,6 +215,22 @@ button:hover {
 
 .btn-info:hover {
     background-color: #138496;
+}
+
+.btn-edit {
+    background-color: var(--warning-color);
+}
+
+.btn-edit:hover {
+    background-color: #e67e22;
+}
+
+.btn-reset {
+    background-color: var(--reset-color);
+}
+
+.btn-reset:hover {
+    background-color: #8e44ad;
 }
 
 .total-row {
@@ -571,47 +590,27 @@ button:hover {
     height: 12px;
 }
 
-.percent-badge {
-    display: inline-block;
-    padding: 3px 8px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: bold;
-}
-
-.percent-badge.low {
-    background-color: #d4edda;
-    color: #155724;
-}
-
-.percent-badge.medium {
-    background-color: #fff3cd;
-    color: #856404;
-}
-
-.percent-badge.high {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-
-.category-badge {
+/* Estilos para badges de tienda */
+.store-badge {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
     text-align: center;
-    min-width: 80px;
+    min-width: 100px;
 }
 
-.usage-badge {
-    display: inline-block;
-    padding: 3px 8px;
-    background-color: #e3f2fd;
-    color: #1976d2;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: bold;
+.store-badge.kaniki {
+    background-color: rgba(52, 152, 219, 0.1);
+    color: #2980b9;
+    border: 1px solid #3498db;
+}
+
+.store-badge.punta_brava {
+    background-color: rgba(46, 204, 113, 0.1);
+    color: #27ae60;
+    border: 1px solid #2ecc71;
 }
 
 /* Estilos para detalles del trabajador */
@@ -662,6 +661,54 @@ button:hover {
     justify-content: space-between;
     margin-bottom: 10px;
     font-weight: 600;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+.reset-confirmation {
+    background-color: #fff3cd;
+    border: 2px solid #ffeaa7;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 8px;
+    display: none;
+}
+
+.auto-save-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #3498db;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+    animation: pulse 1.5s infinite;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.auto-save-success {
+    background-color: #27ae60;
+    animation: none;
+}
+
+.auto-save-error {
+    background-color: #e74c3c;
+    animation: none;
 }
 
 @media (max-width: 768px) {

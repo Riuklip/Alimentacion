@@ -11,62 +11,95 @@ const dietPrices = {
     mejorada: 500
 };
 
-// Categorías de alimentos
-const foodCategories = {
-    frutas: { name: "🍎 Frutas", color: "#ff6b6b" },
-    verduras: { name: "🥦 Verduras", color: "#51cf66" },
-    carnes: { name: "🍗 Carnes", color: "#ff922b" },
-    pescados: { name: "🐟 Pescados", color: "#339af0" },
-    lacteos: { name: "🥛 Lácteos", color: "#ffd43b" },
-    cereales: { name: "🌾 Cereales", color: "#cc5de8" },
-    bebidas: { name: "🥤 Bebidas", color: "#20c997" },
-    otros: { name: "📦 Otros", color: "#adb5bd" }
+// Nombres de tiendas
+const storeNames = {
+    kaniki: "Kaniki",
+    punta_brava: "Punta Brava"
 };
+
+// Variables para control de guardado
+let isSaving = false;
+let saveRetryCount = 0;
+const MAX_RETRIES = 3;
 
 // ==================== INICIALIZACIÓN ====================
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', function() {
-    loadDataFromLocalStorage();
-    setupEventListeners();
-    updateFoodUsageStats();
+    console.log('🚀 Sistema de Gestión de Alimentación iniciando...');
+    
+    try {
+        loadDataFromLocalStorage();
+        setupEventListeners();
+        updateSummary();
+        
+        // Configurar guardados automáticos
+        setupPeriodicSave();
+        setupBeforeUnload();
+        
+        console.log('✅ Sistema iniciado correctamente');
+    } catch (error) {
+        console.error('❌ Error crítico al iniciar:', error);
+        showStatus('⚠️ Error crítico. Contacte al administrador.', 'error');
+    }
 });
 
-// Cargar datos desde localStorage
+// ==================== FUNCIONES DE CARGA Y GUARDADO ====================
+
+// Cargar datos desde localStorage con verificación mejorada
 function loadDataFromLocalStorage() {
-    const savedData = localStorage.getItem('foodManagementData');
-    if (savedData) {
-        try {
+    try {
+        const savedData = localStorage.getItem('foodManagementData');
+        
+        if (savedData) {
+            if (!verifyDataIntegrity()) {
+                console.warn('Datos corruptos, intentando recuperar de backup...');
+                if (restoreFromBackup()) {
+                    return;
+                }
+                throw new Error('Datos corruptos y sin backup disponible');
+            }
+            
             const data = JSON.parse(savedData);
             workers = data.workers || [];
             foodsCatalog = data.foodsCatalog || [];
             nextWorkerId = data.nextWorkerId || 1;
             nextFoodId = data.nextFoodId || 1;
             
+            // Validar IDs
+            if (workers.length > 0) {
+                const maxWorkerId = Math.max(...workers.map(w => w.id || 0));
+                nextWorkerId = Math.max(nextWorkerId, maxWorkerId + 1);
+            }
+            
+            if (foodsCatalog.length > 0) {
+                const maxFoodId = Math.max(...foodsCatalog.map(f => f.id || 0));
+                nextFoodId = Math.max(nextFoodId, maxFoodId + 1);
+            }
+            
             renderWorkers();
             renderFoodsCatalog();
             updateSummary();
-            updateFoodUsageStats();
             
-            showStatus('✅ Datos cargados desde el almacenamiento local', 'success');
-        } catch (error) {
-            console.error('Error cargando datos:', error);
+            const saveCount = data.saveCount || 0;
+            const lastSave = data.lastSave ? new Date(data.lastSave).toLocaleString() : 'Desconocida';
+            
+            console.log(`📊 Datos cargados: ${workers.length} trabajadores, ${foodsCatalog.length} alimentos`);
+            console.log(`💾 Último guardado: ${lastSave} (${saveCount} guardados totales)`);
+            
+            showStatus(`✅ Datos cargados (${workers.length} trabajadores, ${foodsCatalog.length} alimentos)`, 'success');
+        } else {
             initializeWithSampleData();
         }
-    } else {
-        initializeWithSampleData();
+    } catch (error) {
+        console.error('Error crítico cargando datos:', error);
+        
+        // Intentar recuperar de backup
+        if (!restoreFromBackup()) {
+            showStatus('⚠️ Error cargando datos. Iniciando con datos de ejemplo.', 'error');
+            initializeWithSampleData();
+        }
     }
-}
-
-// Guardar datos en localStorage
-function saveDataToLocalStorage() {
-    const data = {
-        workers: workers,
-        foodsCatalog: foodsCatalog,
-        nextWorkerId: nextWorkerId,
-        nextFoodId: nextFoodId
-    };
-    localStorage.setItem('foodManagementData', JSON.stringify(data));
 }
 
 // Inicializar con datos de ejemplo
@@ -81,8 +114,8 @@ function initializeWithSampleData() {
             snacks: 10, 
             snackPrice: 50, 
             foods: [
-                { id: 1, name: "Manzana", quantity: 5, price: 20, store: "kaniki" },
-                { id: 3, name: "Pollo", quantity: 2, price: 150, store: "punta_brava" }
+                { id: 1, name: "Aceite", quantity: 2, price: 850, store: "kaniki" },
+                { id: 3, name: "Pollo Pqte 2Kg", quantity: 1, price: 1650, store: "kaniki" }
             ]
         },
         { 
@@ -94,177 +127,83 @@ function initializeWithSampleData() {
             snacks: 8, 
             snackPrice: 50, 
             foods: [
-                { id: 2, name: "Plátano", quantity: 8, price: 15, store: "kaniki" },
-                { id: 5, name: "Lechuga", quantity: 3, price: 30, store: "punta_brava" }
-            ]
-        },
-        { 
-            id: 3, 
-            name: "Carlos", 
-            surname: "Martínez Sánchez", 
-            diet: "normal", 
-            days: 22, 
-            snacks: 15, 
-            snackPrice: 50, 
-            foods: [
-                { id: 4, name: "Salmón", quantity: 2, price: 200, store: "kaniki" },
-                { id: 1, name: "Manzana", quantity: 10, price: 20, store: "punta_brava" }
+                { id: 2, name: "Frijoles Negros", quantity: 3, price: 380, store: "kaniki" },
+                { id: 5, name: "Leche Condensada Silver Food", quantity: 2, price: 470, store: "kaniki" }
             ]
         }
     ];
     
     foodsCatalog = [
-        { id: 1, name: "Manzana", category: "frutas" },
-        { id: 2, name: "Plátano", category: "frutas" },
-        { id: 3, name: "Pollo", category: "carnes" },
-        { id: 4, name: "Salmón", category: "pescados" },
-        { id: 5, name: "Lechuga", category: "verduras" },
-        { id: 6, name: "Yogur", category: "lacteos" },
-        { id: 7, name: "Arroz", category: "cereales" },
-        { id: 8, name: "Agua", category: "bebidas" }
+        { id: 1, name: "Aceite", price: 850, store: "kaniki" },
+        { id: 2, name: "Frijoles Negros", price: 380, store: "kaniki" },
+        { id: 3, name: "Pollo Pqte 2Kg", price: 1650, store: "kaniki" },
+        { id: 4, name: "Leche Condensada Silver Food", price: 470, store: "kaniki" },
+        { id: 5, name: "Pasta Tomate", price: 800, store: "kaniki" },
+        { id: 6, name: "Jamón Bravo 3Kg", price: 7000, store: "punta_brava" },
+        { id: 7, name: "Chorizo", price: 2500, store: "punta_brava" },
+        { id: 8, name: "Pelly", price: 200, store: "punta_brava" }
     ];
     
-    nextWorkerId = 4;
+    nextWorkerId = 3;
     nextFoodId = 9;
     
     renderWorkers();
     renderFoodsCatalog();
     updateSummary();
-    updateFoodUsageStats();
     saveDataToLocalStorage();
     
     showStatus('✅ Sistema iniciado con datos de ejemplo', 'success');
 }
 
-// ==================== EVENT LISTENERS ====================
-
-// Configurar event listeners
-function setupEventListeners() {
-    // Tabs
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
-            this.classList.add('active');
-            document.getElementById(this.dataset.tab + '-tab').classList.add('active');
-        });
-    });
+// Guardar datos en localStorage con manejo de errores mejorado
+function saveDataToLocalStorage() {
+    if (isSaving) return; // Evitar múltiples guardados simultáneos
     
-    // Botón añadir trabajador
-    document.getElementById('add-worker-btn').addEventListener('click', function() {
-        openWorkerModal();
-    });
-    
-    // Botón añadir alimento al catálogo
-    document.getElementById('add-food-catalog-btn').addEventListener('click', function() {
-        openFoodCatalogModal();
-    });
-    
-    // Formulario trabajador
-    document.getElementById('worker-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        saveWorker();
-    });
-    
-    // Formulario alimento catálogo
-    document.getElementById('food-catalog-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        saveFoodCatalog();
-    });
-    
-    // Botón añadir alimento a trabajador
-    document.getElementById('add-food-btn').addEventListener('click', function() {
-        addFoodToWorker();
-    });
-    
-    // Botón exportar trabajador a Excel
-    document.getElementById('export-worker-excel-btn')?.addEventListener('click', function() {
-        if (currentWorkerId) {
-            exportWorkerToExcel(currentWorkerId);
+    try {
+        isSaving = true;
+        showSaveIndicator('saving');
+        
+        const data = {
+            workers: workers,
+            foodsCatalog: foodsCatalog,
+            nextWorkerId: nextWorkerId,
+            nextFoodId: nextFoodId,
+            lastSave: new Date().toISOString(),
+            saveCount: (getSaveCount() || 0) + 1
+        };
+        
+        localStorage.setItem('foodManagementData', JSON.stringify(data));
+        
+        // Guardar también una copia de seguridad
+        const backupData = {
+            ...data,
+            backupDate: new Date().toISOString()
+        };
+        localStorage.setItem('foodManagementBackup', JSON.stringify(backupData));
+        
+        saveRetryCount = 0;
+        showSaveIndicator('success');
+        
+        // Log para depuración (opcional)
+        console.log(`✅ Datos guardados: ${new Date().toLocaleTimeString()}`);
+        
+    } catch (error) {
+        console.error('❌ Error al guardar:', error);
+        saveRetryCount++;
+        
+        if (saveRetryCount <= MAX_RETRIES) {
+            console.log(`🔄 Reintentando guardado (${saveRetryCount}/${MAX_RETRIES})...`);
+            setTimeout(saveDataToLocalStorage, 1000);
+        } else {
+            showSaveIndicator('error');
+            showStatus('❌ Error crítico al guardar datos. Intenta exportar a Excel como respaldo.', 'error');
         }
-    });
-    
-    // Botones de importación/exportación Excel
-    document.getElementById('import-workers-excel-btn').addEventListener('click', function() {
-        document.getElementById('import-file').setAttribute('data-type', 'workers-excel');
-        document.getElementById('import-file').click();
-    });
-    
-    document.getElementById('import-foods-excel-btn').addEventListener('click', function() {
-        document.getElementById('import-file').setAttribute('data-type', 'foods-excel');
-        document.getElementById('import-file').click();
-    });
-    
-    document.getElementById('export-excel-btn').addEventListener('click', function() {
-        exportAllToExcel();
-    });
-    
-    document.getElementById('export-summary-excel-btn').addEventListener('click', function() {
-        exportSummaryToExcel();
-    });
-    
-    document.getElementById('export-full-excel-btn').addEventListener('click', function() {
-        exportFullReportToExcel();
-    });
-    
-    document.getElementById('export-detailed-excel-btn').addEventListener('click', function() {
-        exportDetailedReportToExcel();
-    });
-    
-    // Botones de plantillas
-    document.getElementById('download-template-btn').addEventListener('click', function() {
-        downloadExcelTemplates();
-    });
-    
-    document.getElementById('download-workers-template-btn').addEventListener('click', function() {
-        downloadWorkersTemplate();
-    });
-    
-    document.getElementById('download-foods-template-btn').addEventListener('click', function() {
-        downloadFoodsTemplate();
-    });
-    
-    // Botón para exportar resumen específico de alimentos
-    document.getElementById('export-food-summary-btn').addEventListener('click', function() {
-        exportFoodSummaryToExcel();
-    });
-    
-    // Botones de importación Excel desde la pestaña Excel
-    document.querySelectorAll('.import-excel-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const type = this.getAttribute('data-type');
-            document.getElementById('import-file').setAttribute('data-type', type + '-excel');
-            document.getElementById('import-file').click();
-        });
-    });
-    
-    // Botones JSON
-    document.getElementById('import-json-btn').addEventListener('click', function() {
-        document.getElementById('import-file').setAttribute('data-type', 'json');
-        document.getElementById('import-file').click();
-    });
-    
-    document.getElementById('export-json-btn').addEventListener('click', exportToJSON);
-    document.getElementById('reset-data-btn').addEventListener('click', resetData);
-    
-    document.getElementById('import-file').addEventListener('change', function(e) {
-        importData(e);
-    });
-    
-    // Cerrar modales
-    document.querySelectorAll('.close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', function() {
-            this.closest('.modal').style.display = 'none';
-        });
-    });
-    
-    // Cerrar modales al hacer clic fuera
-    window.addEventListener('click', function(e) {
-        if (e.target.classList.contains('modal')) {
-            e.target.style.display = 'none';
-        }
-    });
+    } finally {
+        setTimeout(() => {
+            isSaving = false;
+            hideSaveIndicator();
+        }, 1500);
+    }
 }
 
 // ==================== FUNCIONES DE EXCEL ====================
@@ -282,11 +221,11 @@ function downloadExcelTemplates() {
         
         // Plantilla de alimentos
         const foodsTemplate = [
-            ['Nombre', 'Categoria'],
-            ['Manzana', 'frutas'],
-            ['Plátano', 'frutas'],
-            ['Pollo', 'carnes'],
-            ['Salmón', 'pescados']
+            ['Nombre', 'Precio', 'Tienda'],
+            ['Aceite', '850', 'kaniki'],
+            ['Pollo Pqte 2Kg', '1650', 'kaniki'],
+            ['Frijoles Negros', '380', 'kaniki'],
+            ['Jamón Bravo 3Kg', '7000', 'punta_brava']
         ];
         
         // Crear workbook con dos hojas
@@ -308,49 +247,7 @@ function downloadExcelTemplates() {
     }
 }
 
-// Descargar plantilla de trabajadores
-function downloadWorkersTemplate() {
-    try {
-        const template = [
-            ['Nombre', 'Apellidos', 'TipoDieta', 'DiasTrabajados', 'Meriendas', 'PrecioMerienda'],
-            ['Ejemplo: Juan', 'García Pérez', 'normal', '20', '10', '50'],
-            ['Ejemplo: María', 'López Rodríguez', 'mejorada', '18', '8', '50']
-        ];
-        
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(template);
-        XLSX.utils.book_append_sheet(wb, ws, "Trabajadores");
-        
-        XLSX.writeFile(wb, "Plantilla_Trabajadores.xlsx");
-        showStatus('✅ Plantilla de Trabajadores descargada', 'success');
-    } catch (error) {
-        showStatus('❌ Error: ' + error.message, 'error');
-    }
-}
-
-// Descargar plantilla de alimentos
-function downloadFoodsTemplate() {
-    try {
-        const template = [
-            ['Nombre', 'Categoria'],
-            ['Manzana', 'frutas'],
-            ['Pollo', 'carnes'],
-            ['Lechuga', 'verduras'],
-            ['Yogur', 'lacteos']
-        ];
-        
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(template);
-        XLSX.utils.book_append_sheet(wb, ws, "Alimentos");
-        
-        XLSX.writeFile(wb, "Plantilla_Alimentos.xlsx");
-        showStatus('✅ Plantilla de Alimentos descargada', 'success');
-    } catch (error) {
-        showStatus('❌ Error: ' + error.message, 'error');
-    }
-}
-
-// Importar datos desde archivos
+// Importar datos desde archivos Excel
 function importData(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -360,25 +257,19 @@ function importData(event) {
     
     reader.onload = function(e) {
         try {
-            if (type === 'json') {
-                importFromJSON(e.target.result);
-            } else {
-                // Para Excel
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                if (type === 'workers-excel') {
-                    importWorkersFromExcel(workbook);
-                } else if (type === 'foods-excel') {
-                    importFoodsFromExcel(workbook);
-                }
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            if (type === 'workers-excel') {
+                importWorkersFromExcel(workbook);
+            } else if (type === 'foods-excel') {
+                importFoodsFromExcel(workbook);
             }
             
             // Actualizar interfaz
             renderWorkers();
             renderFoodsCatalog();
             updateSummary();
-            updateFoodUsageStats();
             saveDataToLocalStorage();
             
         } catch (error) {
@@ -387,42 +278,61 @@ function importData(event) {
         }
     };
     
-    if (type === 'json') {
-        reader.readAsText(file);
-    } else {
-        reader.readAsArrayBuffer(file);
-    }
+    reader.readAsArrayBuffer(file);
     
     // Limpiar el input de archivo
     event.target.value = '';
 }
 
-// Importar trabajadores desde Excel
+// Importar trabajadores desde Excel (CORREGIDO)
 function importWorkersFromExcel(workbook) {
     try {
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        // Buscar la hoja "Trabajadores" por nombre
+        let worksheetName = workbook.SheetNames.find(name => 
+            name.toLowerCase().includes('trabajador') || 
+            name.toLowerCase().includes('worker')
+        ) || workbook.SheetNames[0];
+        
+        const worksheet = workbook.Sheets[worksheetName];
         const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
         const newWorkers = [];
         const headers = data[0] || [];
         
-        // Encontrar índices de columnas
-        const nameIndex = headers.findIndex(h => h.toString().toLowerCase().includes('nombre'));
-        const surnameIndex = headers.findIndex(h => h.toString().toLowerCase().includes('apellido'));
-        const dietIndex = headers.findIndex(h => h.toString().toLowerCase().includes('dieta'));
-        const daysIndex = headers.findIndex(h => h.toString().toLowerCase().includes('dias'));
-        const snacksIndex = headers.findIndex(h => h.toString().toLowerCase().includes('merienda'));
-        const snackPriceIndex = headers.findIndex(h => h.toString().toLowerCase().includes('precio'));
+        // Encontrar índices de columnas (más robusto)
+        const nameIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('nombre')
+        );
+        const surnameIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('apellido')
+        );
+        const dietIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('dieta') ||
+            h && h.toString().toLowerCase().includes('tipo')
+        );
+        const daysIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('día') ||
+            h && h.toString().toLowerCase().includes('dia')
+        );
+        const snacksIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('merienda')
+        );
+        const snackPriceIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('precio')
+        );
         
         // Procesar filas de datos
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
             if (!row || row.length === 0) continue;
             
+            // Validar que haya al menos nombre
+            if (!row[nameIndex]) continue;
+            
             const worker = {
                 id: nextWorkerId++,
-                name: row[nameIndex] || '',
-                surname: row[surnameIndex] || '',
+                name: (row[nameIndex] || '').toString().trim(),
+                surname: (row[surnameIndex] || '').toString().trim(),
                 diet: (row[dietIndex] || 'normal').toString().toLowerCase(),
                 days: parseInt(row[daysIndex]) || 0,
                 snacks: parseInt(row[snacksIndex]) || 0,
@@ -438,69 +348,77 @@ function importWorkersFromExcel(workbook) {
             newWorkers.push(worker);
         }
         
-        workers = newWorkers;
-        showStatus('✅ Trabajadores importados desde Excel correctamente', 'success');
+        if (newWorkers.length > 0) {
+            workers = newWorkers;
+            showStatus(`✅ ${newWorkers.length} trabajadores importados desde Excel`, 'success');
+        } else {
+            showStatus('⚠️ No se encontraron trabajadores en el archivo', 'info');
+        }
     } catch (error) {
-        throw new Error('Formato de Excel incorrecto para trabajadores');
+        console.error('Error importando trabajadores:', error);
+        throw new Error('Formato de Excel incorrecto para trabajadores: ' + error.message);
     }
 }
 
-// Importar alimentos desde Excel
+// Importar alimentos desde Excel (CORREGIDO)
 function importFoodsFromExcel(workbook) {
     try {
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        // Buscar la hoja "Alimentos" por nombre
+        let worksheetName = workbook.SheetNames.find(name => 
+            name.toLowerCase().includes('alimento') || 
+            name.toLowerCase().includes('food') ||
+            name.toLowerCase().includes('product')
+        ) || workbook.SheetNames[workbook.SheetNames.length > 1 ? 1 : 0];
+        
+        const worksheet = workbook.Sheets[worksheetName];
         const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
         const newFoods = [];
         const headers = data[0] || [];
         
-        // Encontrar índices de columnas
-        const nameIndex = headers.findIndex(h => h.toString().toLowerCase().includes('nombre'));
-        const categoryIndex = headers.findIndex(h => h.toString().toLowerCase().includes('categor'));
+        // Encontrar índices de columnas (más robusto)
+        const nameIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('nombre')
+        );
+        const priceIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('precio')
+        );
+        const storeIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('tienda')
+        );
         
         // Procesar filas de datos
         for (let i = 1; i < data.length; i++) {
             const row = data[i];
             if (!row || row.length === 0) continue;
             
+            // Validar que haya al menos nombre
+            if (!row[nameIndex]) continue;
+            
             const food = {
                 id: nextFoodId++,
-                name: row[nameIndex] || '',
-                category: (row[categoryIndex] || 'otros').toString().toLowerCase()
+                name: (row[nameIndex] || '').toString().trim(),
+                price: parseFloat(row[priceIndex]) || 0,
+                store: (row[storeIndex] || 'kaniki').toString().toLowerCase()
             };
+            
+            // Validar tienda
+            if (food.store !== 'kaniki' && food.store !== 'punta_brava') {
+                food.store = 'kaniki';
+            }
             
             newFoods.push(food);
         }
         
-        foodsCatalog = newFoods;
-        showStatus('✅ Alimentos importados desde Excel correctamente', 'success');
-    } catch (error) {
-        throw new Error('Formato de Excel incorrecto para alimentos');
-    }
-}
-
-// Importar desde JSON
-function importFromJSON(jsonContent) {
-    try {
-        const data = JSON.parse(jsonContent);
-        
-        if (data.workers) {
-            workers = data.workers;
-            if (workers.length > 0) {
-                nextWorkerId = Math.max(...workers.map(w => w.id)) + 1;
-            }
+        if (newFoods.length > 0) {
+            foodsCatalog = newFoods;
+            showStatus(`✅ ${newFoods.length} alimentos importados desde Excel`, 'success');
+        } else {
+            showStatus('⚠️ No se encontraron alimentos en el archivo', 'info');
         }
-        
-        if (data.foodsCatalog) {
-            foodsCatalog = data.foodsCatalog;
-            if (foodsCatalog.length > 0) {
-                nextFoodId = Math.max(...foodsCatalog.map(f => f.id)) + 1;
-            }
-        }
-        
-        showStatus('✅ Datos importados desde JSON correctamente', 'success');
     } catch (error) {
-        throw new Error('Formato JSON incorrecto');
+        console.error('Error importando alimentos:', error);
+        throw new Error('Formato de Excel incorrecto para alimentos: ' + error.message);
     }
 }
 
@@ -510,9 +428,9 @@ function exportAllToExcel() {
         // Crear workbook con múltiples hojas
         const wb = XLSX.utils.book_new();
         
-        // Hoja 1: Trabajadores CON ALIMENTOS Y TIENDA
+        // Hoja 1: Trabajadores
         const workersData = [
-            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días Trabajados', 'Meriendas', 'Precio Merienda', 'Presupuesto Diario', 'Presupuesto Total', 'Gasto Alimentos', 'Alimentos Comprados (Detalle)', 'Tienda']
+            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días Trabajados', 'Meriendas', 'Precio Merienda', 'Presupuesto Diario', 'Presupuesto Total', 'Gasto Alimentos', 'Saldo Restante']
         ];
         
         workers.forEach(worker => {
@@ -520,18 +438,7 @@ function exportAllToExcel() {
             const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
             const totalBudget = (dailyBudget * worker.days) + snackBudget;
             const foodExpense = calculateWorkerFoodExpense(worker);
-            
-            // Crear lista detallada de alimentos con tienda
-            let detalleAlimentos = "";
-            if (worker.foods.length > 0) {
-                const alimentosDetalle = worker.foods.map(food => {
-                    const storeName = food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava';
-                    return `${food.name} (${food.quantity} x $${food.price.toFixed(2)}) - ${storeName}`;
-                });
-                detalleAlimentos = alimentosDetalle.join('; ');
-            } else {
-                detalleAlimentos = "Sin alimentos";
-            }
+            const remaining = totalBudget - foodExpense;
             
             workersData.push([
                 worker.name,
@@ -543,126 +450,71 @@ function exportAllToExcel() {
                 `$${dailyBudget.toFixed(2)}`,
                 `$${totalBudget.toFixed(2)}`,
                 `$${foodExpense.toFixed(2)}`,
-                detalleAlimentos,
-                "Varias tiendas"
+                `$${remaining.toFixed(2)}`
             ]);
         });
         
         const ws1 = XLSX.utils.aoa_to_sheet(workersData);
         
-        // Hoja 2: Resumen con alimentos (nueva)
-        const summaryWithFoodsData = [
-            ['RESUMEN GENERAL CON ALIMENTOS'],
-            ['Fecha', new Date().toLocaleDateString()],
-            [''],
-            ['Trabajador', 'Presupuesto', 'Gasto Alimentos', 'Saldo', 'Alimentos Principales', 'Tienda Principal', 'Cantidad Total Items']
-        ];
-        
-        workers.forEach(worker => {
-            const dailyBudget = dietPrices[worker.diet] || 0;
-            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-            const totalBudget = (dailyBudget * worker.days) + snackBudget;
-            const foodExpense = calculateWorkerFoodExpense(worker);
-            const remaining = totalBudget - foodExpense;
-            
-            // Obtener los 3 alimentos principales (por gasto) y tienda más usada
-            let alimentosPrincipales = "";
-            let tiendaPrincipal = "";
-            let cantidadTotal = 0;
-            
-            if (worker.foods.length > 0) {
-                // Agrupar alimentos por nombre
-                const alimentosAgrupados = {};
-                const tiendas = {};
-                
-                worker.foods.forEach(food => {
-                    cantidadTotal += food.quantity;
-                    
-                    // Contar tiendas
-                    tiendas[food.store] = (tiendas[food.store] || 0) + 1;
-                    
-                    if (alimentosAgrupados[food.name]) {
-                        alimentosAgrupados[food.name].cantidad += food.quantity;
-                        alimentosAgrupados[food.name].gasto += food.quantity * food.price;
-                    } else {
-                        alimentosAgrupados[food.name] = {
-                            cantidad: food.quantity,
-                            gasto: food.quantity * food.price
-                        };
-                    }
-                });
-                
-                // Ordenar por gasto descendente
-                const alimentosOrdenados = Object.entries(alimentosAgrupados)
-                    .sort((a, b) => b[1].gasto - a[1].gasto)
-                    .slice(0, 3);
-                
-                alimentosPrincipales = alimentosOrdenados
-                    .map(([nombre, datos]) => `${nombre} ($${datos.gasto.toFixed(2)})`)
-                    .join(', ');
-                
-                // Encontrar tienda más usada
-                const tiendaMasUsada = Object.entries(tiendas)
-                    .sort((a, b) => b[1] - a[1])[0];
-                tiendaPrincipal = tiendaMasUsada ? (tiendaMasUsada[0] === 'kaniki' ? 'Kaniki' : 'Punta Brava') : "N/A";
-            } else {
-                alimentosPrincipales = "Sin alimentos";
-                tiendaPrincipal = "N/A";
-            }
-            
-            summaryWithFoodsData.push([
-                `${worker.name} ${worker.surname}`,
-                `$${totalBudget.toFixed(2)}`,
-                `$${foodExpense.toFixed(2)}`,
-                `$${remaining.toFixed(2)}`,
-                alimentosPrincipales,
-                tiendaPrincipal,
-                cantidadTotal
-            ]);
-        });
-        
-        const ws2 = XLSX.utils.aoa_to_sheet(summaryWithFoodsData);
-        
-        // Hoja 3: Alimentos (mantenida)
+        // Hoja 2: Alimentos
         const foodsData = [
-            ['ID', 'Nombre', 'Categoría', 'Precio Promedio', 'Total Usos']
+            ['ID', 'Nombre', 'Precio', 'Tienda']
         ];
         
         foodsCatalog.forEach(food => {
-            const usage = calculateFoodUsage(food.id);
             foodsData.push([
                 food.id,
                 food.name,
-                getCategoryDisplayName(food.category),
-                `$${usage.averagePrice.toFixed(2)}`,
-                usage.totalQuantity
+                `$${food.price.toFixed(2)}`,
+                getStoreDisplayName(food.store)
             ]);
         });
         
-        const ws3 = XLSX.utils.aoa_to_sheet(foodsData);
+        const ws2 = XLSX.utils.aoa_to_sheet(foodsData);
+        
+        // Hoja 3: Compras por trabajador
+        const purchasesData = [
+            ['Trabajador', 'Alimento', 'Cantidad', 'Precio Unitario', 'Subtotal', 'Tienda']
+        ];
+        
+        workers.forEach(worker => {
+            worker.foods.forEach(food => {
+                purchasesData.push([
+                    `${worker.name} ${worker.surname}`,
+                    food.name,
+                    food.quantity,
+                    `$${food.price.toFixed(2)}`,
+                    `$${(food.quantity * food.price).toFixed(2)}`,
+                    getStoreDisplayName(food.store)
+                ]);
+            });
+        });
+        
+        const ws3 = XLSX.utils.aoa_to_sheet(purchasesData);
         
         // Agregar hojas al workbook
         XLSX.utils.book_append_sheet(wb, ws1, "Trabajadores");
-        XLSX.utils.book_append_sheet(wb, ws2, "Resumen con Alimentos");
-        XLSX.utils.book_append_sheet(wb, ws3, "Catálogo Alimentos");
+        XLSX.utils.book_append_sheet(wb, ws2, "Alimentos");
+        XLSX.utils.book_append_sheet(wb, ws3, "Compras");
         
         // Escribir el archivo
         XLSX.writeFile(wb, `Sistema_Alimentacion_Completo_${new Date().toISOString().split('T')[0]}.xlsx`);
         
-        showStatus('✅ Todos los datos exportados a Excel con alimentos incluidos', 'success');
+        showStatus('✅ Todos los datos exportados a Excel', 'success');
     } catch (error) {
         console.error('Error exportando a Excel:', error);
         showStatus('❌ Error al exportar a Excel: ' + error.message, 'error');
     }
 }
 
-// Exportar resumen a Excel CON ALIMENTOS Y TIENDA
-function exportSummaryToExcel() {
+// Exportar reporte completo
+function exportFullReportToExcel() {
     try {
         const wb = XLSX.utils.book_new();
         
-        const summaryData = [
-            ['RESUMEN DE ALIMENTACIÓN - ' + new Date().toLocaleDateString()],
+        const reportData = [
+            ['REPORTE COMPLETO - SISTEMA DE ALIMENTACIÓN'],
+            ['Fecha', new Date().toLocaleDateString()],
             [''],
             ['Total Trabajadores', workers.length],
             ['Presupuesto Total', `$${calculateTotalBudget().toFixed(2)}`],
@@ -670,93 +522,7 @@ function exportSummaryToExcel() {
             ['Saldo Total Restante', `$${calculateTotalRemaining().toFixed(2)}`],
             [''],
             ['DETALLE POR TRABAJADOR'],
-            ['Nombre', 'Tipo Dieta', 'Días', 'Meriendas', 'Presupuesto', 'Gasto Alimentos', 'Saldo', '% Utilizado', 'Alimentos Comprados', 'Tienda']
-        ];
-        
-        workers.forEach(worker => {
-            const dailyBudget = dietPrices[worker.diet] || 0;
-            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-            const totalBudget = (dailyBudget * worker.days) + snackBudget;
-            const foodExpense = calculateWorkerFoodExpense(worker);
-            const remaining = totalBudget - foodExpense;
-            const percentUsed = totalBudget > 0 ? ((foodExpense / totalBudget) * 100) : 0;
-            
-            // Crear lista de alimentos comprados
-            let alimentosComprimidos = "";
-            let tiendaInfo = "";
-            
-            if (worker.foods.length > 0) {
-                const alimentosAgrupados = {};
-                const tiendasUsadas = new Set();
-                
-                // Agrupar alimentos por nombre para comprimir la lista
-                worker.foods.forEach(food => {
-                    tiendasUsadas.add(food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava');
-                    
-                    if (alimentosAgrupados[food.name]) {
-                        alimentosAgrupados[food.name].cantidad += food.quantity;
-                        alimentosAgrupados[food.name].subtotal += food.quantity * food.price;
-                    } else {
-                        alimentosAgrupados[food.name] = {
-                            cantidad: food.quantity,
-                            subtotal: food.quantity * food.price
-                        };
-                    }
-                });
-                
-                // Crear string comprimido
-                const alimentosArray = [];
-                for (const [nombre, datos] of Object.entries(alimentosAgrupados)) {
-                    alimentosArray.push(`${nombre} (${datos.cantidad}x = $${datos.subtotal.toFixed(2)})`);
-                }
-                
-                alimentosComprimidos = alimentosArray.join('; ');
-                tiendaInfo = Array.from(tiendasUsadas).join(', ');
-                
-                // Limitar longitud si es muy largo
-                if (alimentosComprimidos.length > 100) {
-                    alimentosComprimidos = alimentosComprimidos.substring(0, 97) + '...';
-                }
-            } else {
-                alimentosComprimidos = "Sin alimentos comprados";
-                tiendaInfo = "N/A";
-            }
-            
-            summaryData.push([
-                `${worker.name} ${worker.surname}`,
-                getDietDisplayName(worker.diet),
-                worker.days,
-                worker.snacks || 0,
-                `$${totalBudget.toFixed(2)}`,
-                `$${foodExpense.toFixed(2)}`,
-                `$${remaining.toFixed(2)}`,
-                `${percentUsed.toFixed(1)}%`,
-                alimentosComprimidos,
-                tiendaInfo
-            ]);
-        });
-        
-        const ws = XLSX.utils.aoa_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(wb, ws, "Resumen");
-        
-        XLSX.writeFile(wb, `Resumen_Alimentacion_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showStatus('✅ Resumen exportado a Excel correctamente', 'success');
-    } catch (error) {
-        showStatus('❌ Error: ' + error.message, 'error');
-    }
-}
-
-// Exportar reporte completo a Excel CON DETALLE DE ALIMENTOS Y TIENDA
-function exportFullReportToExcel() {
-    try {
-        const wb = XLSX.utils.book_new();
-        
-        // Hoja 1: Trabajadores con detalles Y ALIMENTOS CON TIENDA
-        const workersData = [
-            ['INFORME COMPLETO DE TRABAJADORES'],
-            ['Fecha', new Date().toLocaleDateString()],
-            [''],
-            ['ID', 'Nombre', 'Apellidos', 'Tipo Dieta', 'Días', 'Meriendas', 'Precio Merienda', 'Presupuesto Diario', 'Presupuesto Total', 'Gasto Alimentos', 'Saldo', 'Lista de Alimentos', 'Tienda']
+            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días', 'Presupuesto', 'Gasto', 'Saldo', 'Alimentos Comprados']
         ];
         
         workers.forEach(worker => {
@@ -766,453 +532,58 @@ function exportFullReportToExcel() {
             const foodExpense = calculateWorkerFoodExpense(worker);
             const remaining = totalBudget - foodExpense;
             
-            // Crear lista detallada de alimentos con tienda
-            let listaAlimentos = "";
-            let tiendasUsadas = new Set();
-            
+            // Crear lista de alimentos
+            let alimentosList = "";
             if (worker.foods.length > 0) {
-                const alimentosDetalle = worker.foods.map(food => {
-                    const storeName = food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava';
-                    tiendasUsadas.add(storeName);
-                    return `${food.name}: ${food.quantity} x $${food.price.toFixed(2)} = $${(food.quantity * food.price).toFixed(2)} (${storeName})`;
-                });
-                listaAlimentos = alimentosDetalle.join('\n');
+                alimentosList = worker.foods.map(f => 
+                    `${f.name} (${f.quantity} x $${f.price.toFixed(2)})`
+                ).join('; ');
             } else {
-                listaAlimentos = "Sin alimentos registrados";
+                alimentosList = "Sin alimentos";
             }
             
-            workersData.push([
-                worker.id,
+            reportData.push([
                 worker.name,
                 worker.surname,
                 getDietDisplayName(worker.diet),
                 worker.days,
-                worker.snacks || 0,
-                `$${(worker.snackPrice || 50).toFixed(2)}`,
-                `$${dailyBudget.toFixed(2)}`,
                 `$${totalBudget.toFixed(2)}`,
                 `$${foodExpense.toFixed(2)}`,
                 `$${remaining.toFixed(2)}`,
-                listaAlimentos,
-                Array.from(tiendasUsadas).join(', ')
+                alimentosList
             ]);
         });
         
-        const ws1 = XLSX.utils.aoa_to_sheet(workersData);
-        
-        // Hoja 2: Detalle EXTENDIDO de compras por trabajador CON TIENDA
-        const purchasesData = [
-            ['DETALLE EXTENDIDO DE COMPRAS POR TRABAJADOR'],
-            [''],
-            ['Trabajador', 'Alimento', 'Cantidad', 'Precio Unitario', 'Subtotal', 'Categoría', 'Tienda', 'Fecha Registro']
-        ];
-        
-        workers.forEach(worker => {
-            worker.foods.forEach(food => {
-                const foodInfo = foodsCatalog.find(f => f.id === food.id);
-                const storeName = food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava';
-                purchasesData.push([
-                    `${worker.name} ${worker.surname}`,
-                    food.name,
-                    food.quantity,
-                    `$${food.price.toFixed(2)}`,
-                    `$${(food.quantity * food.price).toFixed(2)}`,
-                    foodInfo ? getCategoryDisplayName(foodInfo.category) : 'Desconocida',
-                    storeName,
-                    new Date().toLocaleDateString()
-                ]);
-            });
-        });
-        
-        const ws2 = XLSX.utils.aoa_to_sheet(purchasesData);
-        
-        // Hoja 3: Resumen de alimentos por trabajador CON TIENDA
-        const foodSummaryData = [
-            ['RESUMEN DE ALIMENTOS POR TRABAJADOR'],
-            [''],
-            ['Trabajador', 'Total Alimentos Diferentes', 'Cantidad Total Items', 'Gasto Total', 'Tienda Principal', 'Detalle de Alimentos']
-        ];
-        
-        workers.forEach(worker => {
-            const alimentosUnicos = [...new Set(worker.foods.map(f => f.name))];
-            const cantidadTotal = worker.foods.reduce((sum, food) => sum + food.quantity, 0);
-            const gastoTotal = calculateWorkerFoodExpense(worker);
-            
-            // Agrupar por tienda
-            const tiendas = {};
-            worker.foods.forEach(food => {
-                const storeName = food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava';
-                tiendas[storeName] = (tiendas[storeName] || 0) + 1;
-            });
-            
-            const tiendaPrincipal = Object.entries(tiendas)
-                .sort((a, b) => b[1] - a[1])[0];
-            
-            // Crear detalle compacto
-            const alimentosAgrupados = {};
-            worker.foods.forEach(food => {
-                if (alimentosAgrupados[food.name]) {
-                    alimentosAgrupados[food.name].cantidad += food.quantity;
-                    alimentosAgrupados[food.name].subtotal += food.quantity * food.price;
-                } else {
-                    alimentosAgrupados[food.name] = {
-                        cantidad: food.quantity,
-                        subtotal: food.quantity * food.price
-                    };
-                }
-            });
-            
-            const detalleCompacto = Object.entries(alimentosAgrupados)
-                .map(([nombre, datos]) => `${nombre}: ${datos.cantidad}u ($${datos.subtotal.toFixed(2)})`)
-                .join('; ');
-            
-            foodSummaryData.push([
-                `${worker.name} ${worker.surname}`,
-                alimentosUnicos.length,
-                cantidadTotal,
-                `$${gastoTotal.toFixed(2)}`,
-                tiendaPrincipal ? tiendaPrincipal[0] : "N/A",
-                detalleCompacto
-            ]);
-        });
-        
-        const ws3 = XLSX.utils.aoa_to_sheet(foodSummaryData);
-        
-        // Hoja 4: Estadísticas de alimentos (mantenida igual)
-        const statsData = [
-            ['ESTADÍSTICAS DE ALIMENTOS'],
-            [''],
-            ['Alimento', 'Categoría', 'Total Usos', 'Cantidad Total', 'Gasto Total', 'Precio Promedio']
-        ];
-        
-        foodsCatalog.forEach(food => {
-            const usage = calculateFoodUsage(food.id);
-            statsData.push([
-                food.name,
-                getCategoryDisplayName(food.category),
-                usage.totalUses,
-                usage.totalQuantity,
-                `$${usage.totalExpense.toFixed(2)}`,
-                `$${usage.averagePrice.toFixed(2)}`
-            ]);
-        });
-        
-        const ws4 = XLSX.utils.aoa_to_sheet(statsData);
-        
-        // Nombrar las hojas apropiadamente
-        XLSX.utils.book_append_sheet(wb, ws1, "Trabajadores Completo");
-        XLSX.utils.book_append_sheet(wb, ws2, "Detalle Compras");
-        XLSX.utils.book_append_sheet(wb, ws3, "Resumen Alimentos");
-        XLSX.utils.book_append_sheet(wb, ws4, "Estadísticas");
-        
-        // Ajustar anchos de columnas automáticamente
-        const wscols = [
-            {wch: 5},   // ID
-            {wch: 15},  // Nombre
-            {wch: 15},  // Apellidos
-            {wch: 12},  // Tipo Dieta
-            {wch: 8},   // Días
-            {wch: 10},  // Meriendas
-            {wch: 15},  // Precio Merienda
-            {wch: 18},  // Presupuesto Diario
-            {wch: 16},  // Presupuesto Total
-            {wch: 15},  // Gasto Alimentos
-            {wch: 12},  // Saldo
-            {wch: 50},  // Lista de Alimentos
-            {wch: 15}   // Tienda
-        ];
-        ws1['!cols'] = wscols;
+        const ws = XLSX.utils.aoa_to_sheet(reportData);
+        XLSX.utils.book_append_sheet(wb, ws, "Reporte Completo");
         
         XLSX.writeFile(wb, `Reporte_Completo_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showStatus('✅ Reporte completo exportado a Excel con detalles de alimentos y tienda', 'success');
+        showStatus('✅ Reporte completo exportado a Excel', 'success');
     } catch (error) {
         showStatus('❌ Error: ' + error.message, 'error');
     }
 }
 
-// Exportar detalles por trabajador a Excel CON TIENDA
-function exportDetailedReportToExcel() {
-    try {
-        const wb = XLSX.utils.book_new();
-        
-        workers.forEach(worker => {
-            const dailyBudget = dietPrices[worker.diet] || 0;
-            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-            const totalBudget = (dailyBudget * worker.days) + snackBudget;
-            const foodExpense = calculateWorkerFoodExpense(worker);
-            const remaining = totalBudget - foodExpense;
-            
-            const workerData = [
-                [`INFORME DETALLADO: ${worker.name} ${worker.surname}`],
-                ['Fecha', new Date().toLocaleDateString()],
-                [''],
-                ['INFORMACIÓN GENERAL'],
-                ['Tipo de Alimentación', getDietDisplayName(worker.diet)],
-                ['Días Trabajados', worker.days],
-                ['Meriendas', worker.snacks || 0],
-                ['Precio por Merienda', `$${(worker.snackPrice || 50).toFixed(2)}`],
-                ['Presupuesto Diario', `$${dailyBudget.toFixed(2)}`],
-                ['Presupuesto Total', `$${totalBudget.toFixed(2)}`],
-                ['Gasto en Alimentos', `$${foodExpense.toFixed(2)}`],
-                ['Saldo Restante', `$${remaining.toFixed(2)}`],
-                ['Porcentaje Utilizado', `${totalBudget > 0 ? ((foodExpense / totalBudget) * 100).toFixed(1) : 0}%`],
-                [''],
-                ['LISTA DE COMPRAS CON TIENDA'],
-                ['Alimento', 'Cantidad', 'Precio Unitario', 'Subtotal', 'Tienda']
-            ];
-            
-            worker.foods.forEach(food => {
-                const storeName = food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava';
-                workerData.push([
-                    food.name,
-                    food.quantity,
-                    `$${food.price.toFixed(2)}`,
-                    `$${(food.quantity * food.price).toFixed(2)}`,
-                    storeName
-                ]);
-            });
-            
-            workerData.push(['', '', '', 'TOTAL:', `$${foodExpense.toFixed(2)}`, '']);
-            
-            const ws = XLSX.utils.aoa_to_sheet(workerData);
-            const sheetName = `${worker.name.substring(0, 10)}_${worker.surname.substring(0, 10)}`.replace(/\s+/g, '_');
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-        });
-        
-        XLSX.writeFile(wb, `Detalles_Trabajadores_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showStatus('✅ Reportes detallados exportados a Excel', 'success');
-    } catch (error) {
-        showStatus('❌ Error: ' + error.message, 'error');
-    }
+// ==================== FUNCIONES DE CÁLCULO MEJORADAS ====================
+
+// Calcular total de almuerzos normales
+function calculateNormalLunches() {
+    return workers
+        .filter(worker => worker.diet === 'normal')
+        .reduce((total, worker) => total + (worker.days || 0), 0);
 }
 
-// Exportar un trabajador específico a Excel CON TIENDA
-function exportWorkerToExcel(workerId) {
-    const worker = workers.find(w => w.id === workerId);
-    if (!worker) return;
-    
-    try {
-        const wb = XLSX.utils.book_new();
-        
-        const dailyBudget = dietPrices[worker.diet] || 0;
-        const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-        const totalBudget = (dailyBudget * worker.days) + snackBudget;
-        const foodExpense = calculateWorkerFoodExpense(worker);
-        const remaining = totalBudget - foodExpense;
-        
-        const workerData = [
-            [`INFORME DE ALIMENTACIÓN: ${worker.name} ${worker.surname}`],
-            ['Fecha', new Date().toLocaleDateString()],
-            [''],
-            ['INFORMACIÓN GENERAL'],
-            ['Nombre', worker.name],
-            ['Apellidos', worker.surname],
-            ['Tipo de Alimentación', getDietDisplayName(worker.diet)],
-            ['Días Trabajados', worker.days],
-            ['Meriendas', worker.snacks || 0],
-            ['Precio por Merienda', `$${(worker.snackPrice || 50).toFixed(2)}`],
-            ['Presupuesto Diario', `$${dailyBudget.toFixed(2)}`],
-            ['Presupuesto Total', `$${totalBudget.toFixed(2)}`],
-            [''],
-            ['RESUMEN FINANCIERO'],
-            ['Gasto en Alimentos', `$${foodExpense.toFixed(2)}`],
-            ['Saldo Restante', `$${remaining.toFixed(2)}`],
-            ['Porcentaje Utilizado', `${totalBudget > 0 ? ((foodExpense / totalBudget) * 100).toFixed(1) : 0}%`],
-            [''],
-            ['DETALLE DE COMPRAS CON TIENDA'],
-            ['Alimento', 'Cantidad', 'Precio Unitario', 'Subtotal', 'Tienda']
-        ];
-        
-        worker.foods.forEach(food => {
-            const storeName = food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava';
-            workerData.push([
-                food.name,
-                food.quantity,
-                `$${food.price.toFixed(2)}`,
-                `$${(food.quantity * food.price).toFixed(2)}`,
-                storeName
-            ]);
-        });
-        
-        workerData.push(['', '', '', 'TOTAL:', `$${foodExpense.toFixed(2)}`, '']);
-        
-        const ws = XLSX.utils.aoa_to_sheet(workerData);
-        XLSX.utils.book_append_sheet(wb, ws, "Informe");
-        
-        XLSX.writeFile(wb, `Informe_${worker.name}_${worker.surname}_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showStatus(`✅ Informe de ${worker.name} exportado a Excel`, 'success');
-    } catch (error) {
-        showStatus('❌ Error: ' + error.message, 'error');
-    }
+// Calcular total de almuerzos mejorados
+function calculateImprovedLunches() {
+    return workers
+        .filter(worker => worker.diet === 'mejorada')
+        .reduce((total, worker) => total + (worker.days || 0), 0);
 }
 
-// Nueva función: Exportar resumen específico con alimentos y tienda
-function exportFoodSummaryToExcel() {
-    try {
-        const wb = XLSX.utils.book_new();
-        
-        const foodSummaryData = [
-            ['RESUMEN DE ALIMENTOS COMPRADOS POR TRABAJADOR'],
-            ['Fecha', new Date().toLocaleDateString()],
-            [''],
-            ['Trabajador', 'Total Alimentos', 'Items Totales', 'Gasto Total', 'Tienda', 'Detalle de Alimentos Comprados']
-        ];
-        
-        workers.forEach(worker => {
-            if (worker.foods.length === 0) {
-                foodSummaryData.push([
-                    `${worker.name} ${worker.surname}`,
-                    '0',
-                    '0',
-                    '$0.00',
-                    'N/A',
-                    'Sin alimentos comprados'
-                ]);
-                return;
-            }
-            
-            // Agrupar alimentos para resumen compacto
-            const alimentosAgrupados = {};
-            let itemsTotales = 0;
-            const tiendasUsadas = new Set();
-            
-            worker.foods.forEach(food => {
-                itemsTotales += food.quantity;
-                tiendasUsadas.add(food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava');
-                
-                if (alimentosAgrupados[food.name]) {
-                    alimentosAgrupados[food.name].cantidad += food.quantity;
-                    alimentosAgrupados[food.name].subtotal += food.quantity * food.price;
-                } else {
-                    alimentosAgrupados[food.name] = {
-                        cantidad: food.quantity,
-                        subtotal: food.quantity * food.price
-                    };
-                }
-            });
-            
-            // Crear detalle formateado
-            const detalleAlimentos = Object.entries(alimentosAgrupados)
-                .map(([nombre, datos]) => 
-                    `${nombre}: ${datos.cantidad} unidad${datos.cantidad > 1 ? 'es' : ''} = $${datos.subtotal.toFixed(2)}`
-                )
-                .join('\n');
-            
-            const gastoTotal = calculateWorkerFoodExpense(worker);
-            const alimentosUnicos = Object.keys(alimentosAgrupados).length;
-            const tiendaInfo = Array.from(tiendasUsadas).join(', ');
-            
-            foodSummaryData.push([
-                `${worker.name} ${worker.surname}`,
-                alimentosUnicos,
-                itemsTotales,
-                `$${gastoTotal.toFixed(2)}`,
-                tiendaInfo,
-                detalleAlimentos
-            ]);
-        });
-        
-        // Agregar totales generales
-        foodSummaryData.push(['']);
-        foodSummaryData.push(['TOTALES GENERALES']);
-        
-        const totalAlimentos = workers.reduce((sum, worker) => 
-            sum + [...new Set(worker.foods.map(f => f.name))].length, 0
-        );
-        
-        const totalItems = workers.reduce((sum, worker) => 
-            sum + worker.foods.reduce((s, f) => s + f.quantity, 0), 0
-        );
-        
-        const totalGasto = calculateTotalFoodExpense();
-        
-        foodSummaryData.push([
-            'TODOS LOS TRABAJADORES',
-            totalAlimentos,
-            totalItems,
-            `$${totalGasto.toFixed(2)}`,
-            'Todas las tiendas',
-            `Gasto total en alimentos de todos los trabajadores`
-        ]);
-        
-        const ws = XLSX.utils.aoa_to_sheet(foodSummaryData);
-        
-        // Ajustar anchos de columnas
-        ws['!cols'] = [
-            {wch: 25},  // Trabajador
-            {wch: 15},  // Total Alimentos
-            {wch: 15},  // Items Totales
-            {wch: 15},  // Gasto Total
-            {wch: 20},  // Tienda
-            {wch: 60}   // Detalle de Alimentos
-        ];
-        
-        XLSX.utils.book_append_sheet(wb, ws, "Resumen Alimentos");
-        
-        XLSX.writeFile(wb, `Resumen_Alimentos_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showStatus('✅ Resumen de alimentos exportado a Excel', 'success');
-    } catch (error) {
-        showStatus('❌ Error: ' + error.message, 'error');
-    }
-}
-
-// Exportar a JSON
-function exportToJSON() {
-    try {
-        const data = {
-            workers: workers,
-            foodsCatalog: foodsCatalog
-        };
-        
-        const jsonStr = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `datos_alimentacion_${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        showStatus('✅ Datos exportados a JSON correctamente', 'success');
-    } catch (error) {
-        console.error('Error exportando a JSON:', error);
-        showStatus('❌ Error al exportar a JSON: ' + error.message, 'error');
-    }
-}
-
-// ==================== FUNCIONES DE CÁLCULO ====================
-
-// Calcular uso de alimentos
-function calculateFoodUsage(foodId) {
-    let totalQuantity = 0;
-    let totalExpense = 0;
-    let totalUses = 0;
-    
-    workers.forEach(worker => {
-        worker.foods.forEach(food => {
-            if (food.id === foodId) {
-                totalQuantity += food.quantity;
-                totalExpense += food.quantity * food.price;
-                totalUses++;
-            }
-        });
-    });
-    
-    return {
-        totalQuantity,
-        totalExpense,
-        totalUses,
-        averagePrice: totalQuantity > 0 ? totalExpense / totalQuantity : 0
-    };
-}
-
-// Actualizar estadísticas de uso de alimentos
-function updateFoodUsageStats() {
-    foodsCatalog.forEach(food => {
-        food.usage = calculateFoodUsage(food.id);
-    });
+// Calcular total de meriendas
+function calculateTotalSnacks() {
+    return workers
+        .reduce((total, worker) => total + (worker.snacks || 0), 0);
 }
 
 // Calcular gasto de un trabajador
@@ -1239,6 +610,509 @@ function calculateTotalRemaining() {
     return calculateTotalBudget() - calculateTotalFoodExpense();
 }
 
+// ==================== FUNCIONES DE EXPORTACIÓN MEJORADAS ====================
+
+// Exportar Factura en formato específico MEJORADO
+function exportFacturaExcel() {
+    try {
+        const wb = XLSX.utils.book_new();
+        
+        // Calcular totales
+        const normalLunches = calculateNormalLunches();
+        const improvedLunches = calculateImprovedLunches();
+        const totalSnacks = calculateTotalSnacks();
+        
+        // Crear hoja con formato de factura mejorada
+        const facturaData = [
+            ['', '', '', '', 'Factura No:', ''],
+            ['', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['No.', 'Descripción', 'U/M', 'Cantidad', 'Precio CUP', 'Importe'],
+            ['1', 'ALMUERZOS', 'U', normalLunches, '400', normalLunches * 400],
+            ['2', 'COMIDAS', 'U', '', '400', '0'],
+            ['3', 'RESFUERZO MEDIO', 'U', improvedLunches, '500', improvedLunches * 500],
+            ['4', 'MERIENDAS LIGERAS', 'U', totalSnacks, '200', totalSnacks * 200],
+            ['5', 'TRANSPORTACION', 'U', '', '6', '0'],
+            ['IMPORTE TOTAL', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['Pagase en CUP en Cuenta Bancaria', '', '', '', '', ''],
+            ['1241570000832912', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['Por el Restaurante:', '', '', 'Por la ETECSA CTL Caibarién', '', ''],
+            ['Nombre y Apellidos:', '', '', 'Nombre y Apellidos:', '', ''],
+            ['Cargo:', '', '', 'Cargo:', '', ''],
+            ['Firma:', '', '', 'Firma:', '', ''],
+            ['FECHA', '', '', 'FECHA', '', '']
+        ];
+        
+        // Calcular el importe total
+        const total = (normalLunches * 400) + (improvedLunches * 500) + (totalSnacks * 200);
+        facturaData[10][5] = total; // Fila 11, columna 6 (0-index: 10,5)
+        
+        const ws = XLSX.utils.aoa_to_sheet(facturaData);
+        
+        // Aplicar estilos para que se parezca al original
+        // Configurar anchos de columna
+        const wscols = [
+            {wch: 5},   // No.
+            {wch: 25},  // Descripción
+            {wch: 5},   // U/M
+            {wch: 10},  // Cantidad
+            {wch: 10},  // Precio CUP
+            {wch: 12}   // Importe
+        ];
+        ws['!cols'] = wscols;
+        
+        // Aplicar formato de número a las celdas de importe
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for(let R = range.s.r; R <= range.e.r; ++R) {
+            for(let C = range.s.c; C <= range.e.c; ++C) {
+                const cell_address = {c: C, r: R};
+                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                
+                // Aplicar bordes a todas las celdas
+                if (!ws[cell_ref]) ws[cell_ref] = {};
+                ws[cell_ref].s = {
+                    border: {
+                        top: {style: 'thin', color: {rgb: "000000"}},
+                        bottom: {style: 'thin', color: {rgb: "000000"}},
+                        left: {style: 'thin', color: {rgb: "000000"}},
+                        right: {style: 'thin', color: {rgb: "000000"}}
+                    }
+                };
+                
+                // Negrita para encabezados y totales
+                if (R === 4 || R === 10 || R === 15 || R === 16 || R === 17 || R === 18 || R === 19) {
+                    ws[cell_ref].s.font = { bold: true };
+                }
+            }
+        }
+        
+        XLSX.utils.book_append_sheet(wb, ws, "Factura");
+        XLSX.writeFile(wb, `Factura_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showStatus('✅ Factura exportada en formato Excel con datos calculados', 'success');
+    } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+    }
+}
+
+// Obtener TODOS los productos de una tienda, incluso con cantidad 0
+function getAllProductsByStore(store) {
+    const storeProducts = [];
+    
+    // Obtener todos los alimentos de la tienda del catálogo
+    const allStoreFoods = foodsCatalog.filter(food => food.store === store);
+    
+    // Crear un mapa para llevar el conteo
+    const productMap = {};
+    
+    // Inicializar todos los productos con cantidad 0
+    allStoreFoods.forEach(food => {
+        productMap[food.name] = {
+            id: food.id,
+            price: food.price,
+            quantity: 0,
+            total: 0
+        };
+    });
+    
+    // Sumar las cantidades pedidas por los trabajadores
+    workers.forEach(worker => {
+        worker.foods.forEach(foodItem => {
+            // Verificar si el alimento pertenece a la tienda actual
+            const foodInfo = foodsCatalog.find(f => f.id === foodItem.id && f.store === store);
+            if (foodInfo && productMap[foodInfo.name]) {
+                productMap[foodInfo.name].quantity += foodItem.quantity;
+                productMap[foodInfo.name].total += foodItem.quantity * foodInfo.price;
+            }
+        });
+    });
+    
+    // Convertir a array ordenado
+    Object.entries(productMap).forEach(([name, data], index) => {
+        storeProducts.push({
+            no: index + 1,
+            name: name,
+            price: data.price,
+            quantity: data.quantity,
+            total: data.total
+        });
+    });
+    
+    return storeProducts.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Exportar Productos Caniki MEJORADO - Todos los productos
+function exportProductosCanikiExcel() {
+    try {
+        const wb = XLSX.utils.book_new();
+        const productos = getAllProductsByStore('kaniki');
+        
+        // Crear hoja con formato de Productos Caniki mejorado
+        const productosData = [
+            ['', 'ETECSA CAIBARIÉN', '', '', ''],
+            ['', `Fecha: ${new Date().toLocaleDateString()}`, '', '', ''],
+            ['', '', '', '', ''],
+            ['No', 'Productos', 'Precio', 'Cant.', 'Imp.'],
+        ];
+        
+        // Agregar todos los productos
+        productos.forEach(producto => {
+            productosData.push([
+                producto.no,
+                producto.name,
+                producto.price,
+                producto.quantity,
+                producto.total
+            ]);
+        });
+        
+        // Calcular totales
+        const totalCantidad = productos.reduce((sum, p) => sum + p.quantity, 0);
+        const totalImporte = productos.reduce((sum, p) => sum + p.total, 0);
+        
+        // Agregar filas vacías si es necesario
+        const rowsNeeded = 40; // Total de filas en el formato
+        for (let i = productosData.length; i < rowsNeeded - 1; i++) {
+            productosData.push(['', '', '', '', '']);
+        }
+        
+        // Agregar fila de total
+        productosData.push(['', 'TOTAL', '', totalCantidad, totalImporte]);
+        
+        const ws = XLSX.utils.aoa_to_sheet(productosData);
+        
+        // Aplicar estilos profesionales
+        const wscols = [
+            {wch: 5},   // No
+            {wch: 35},  // Productos
+            {wch: 12},  // Precio
+            {wch: 10},  // Cant.
+            {wch: 15}   // Imp.
+        ];
+        ws['!cols'] = wscols;
+        
+        // Aplicar formato de número y bordes
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for(let R = range.s.r; R <= range.e.r; ++R) {
+            for(let C = range.s.c; C <= range.e.c; ++C) {
+                const cell_address = {c: C, r: R};
+                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                
+                if (!ws[cell_ref]) continue;
+                
+                // Aplicar bordes a todas las celdas
+                ws[cell_ref].s = {
+                    border: {
+                        top: {style: 'thin', color: {rgb: "000000"}},
+                        bottom: {style: 'thin', color: {rgb: "000000"}},
+                        left: {style: 'thin', color: {rgb: "000000"}},
+                        right: {style: 'thin', color: {rgb: "000000"}}
+                    }
+                };
+                
+                // Negrita para encabezados y totales
+                if (R === 3 || (R === productosData.length - 1 && C > 0)) {
+                    ws[cell_ref].s.font = { bold: true };
+                    if (R === productosData.length - 1) {
+                        ws[cell_ref].s.fill = {
+                            fgColor: {rgb: "FFFF00"} // Amarillo para total
+                        };
+                    }
+                }
+                
+                // Formato de número para las columnas de Precio, Cant. e Imp.
+                if (C === 2 || C === 3 || C === 4) {
+                    ws[cell_ref].s.numFmt = '#,##0.00';
+                }
+            }
+        }
+        
+        XLSX.utils.book_append_sheet(wb, ws, "Productos Caniki");
+        XLSX.writeFile(wb, `Productos_Caniki_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showStatus('✅ Productos Caniki exportados con todos los productos', 'success');
+    } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+    }
+}
+
+// Exportar Productos Punta Brava MEJORADO - Todos los productos
+function exportProductosPuntaBravaExcel() {
+    try {
+        const wb = XLSX.utils.book_new();
+        const productos = getAllProductsByStore('punta_brava');
+        
+        if (productos.length === 0) {
+            showStatus('⚠️ No hay productos de Punta Brava en el catálogo', 'info');
+            return;
+        }
+        
+        // Crear hoja con formato de Productos Punta Brava mejorado
+        const productosData = [
+            ['', 'ETECSA CAIBARIÉN', '', '', ''],
+            ['', `Fecha: ${new Date().toLocaleDateString()}`, '', '', ''],
+            ['', '', '', '', ''],
+            ['No', 'Productos', 'Precio', 'Cant.', 'Imp.'],
+        ];
+        
+        // Agregar todos los productos
+        productos.forEach(producto => {
+            productosData.push([
+                producto.no,
+                producto.name,
+                producto.price,
+                producto.quantity,
+                producto.total
+            ]);
+        });
+        
+        // Calcular totales
+        const totalCantidad = productos.reduce((sum, p) => sum + p.quantity, 0);
+        const totalImporte = productos.reduce((sum, p) => sum + p.total, 0);
+        
+        // Agregar filas vacías si es necesario
+        const rowsNeeded = 40; // Total de filas en el formato
+        for (let i = productosData.length; i < rowsNeeded - 1; i++) {
+            productosData.push(['', '', '', '', '']);
+        }
+        
+        // Agregar fila de total
+        productosData.push(['', 'TOTAL', '', totalCantidad, totalImporte]);
+        
+        const ws = XLSX.utils.aoa_to_sheet(productosData);
+        
+        // Aplicar estilos profesionales
+        const wscols = [
+            {wch: 5},   // No
+            {wch: 35},  // Productos
+            {wch: 12},  // Precio
+            {wch: 10},  // Cant.
+            {wch: 15}   // Imp.
+        ];
+        ws['!cols'] = wscols;
+        
+        // Aplicar formato de número y bordes
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for(let R = range.s.r; R <= range.e.r; ++R) {
+            for(let C = range.s.c; C <= range.e.c; ++C) {
+                const cell_address = {c: C, r: R};
+                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                
+                if (!ws[cell_ref]) continue;
+                
+                // Aplicar bordes a todas las celdas
+                ws[cell_ref].s = {
+                    border: {
+                        top: {style: 'thin', color: {rgb: "000000"}},
+                        bottom: {style: 'thin', color: {rgb: "000000"}},
+                        left: {style: 'thin', color: {rgb: "000000"}},
+                        right: {style: 'thin', color: {rgb: "000000"}}
+                    }
+                };
+                
+                // Negrita para encabezados y totales
+                if (R === 3 || (R === productosData.length - 1 && C > 0)) {
+                    ws[cell_ref].s.font = { bold: true };
+                    if (R === productosData.length - 1) {
+                        ws[cell_ref].s.fill = {
+                            fgColor: {rgb: "FFFF00"} // Amarillo para total
+                        };
+                    }
+                }
+                
+                // Formato de número para las columnas de Precio, Cant. e Imp.
+                if (C === 2 || C === 3 || C === 4) {
+                    ws[cell_ref].s.numFmt = '#,##0.00';
+                }
+            }
+        }
+        
+        XLSX.utils.book_append_sheet(wb, ws, "Productos Punta Brava");
+        XLSX.writeFile(wb, `Productos_Punta_Brava_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showStatus('✅ Productos Punta Brava exportados con todos los productos', 'success');
+    } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+    }
+}
+
+// Exportar resumen completo de pedidos para la empresa CON ESTILOS
+function exportResumenPedidosEmpresa() {
+    try {
+        const wb = XLSX.utils.book_new();
+        
+        // Resumen por tienda
+        const productosKaniki = getAllProductsByStore('kaniki');
+        const productosPuntaBrava = getAllProductsByStore('punta_brava');
+        
+        // Hoja 1: Resumen General CON ESTILOS
+        const resumenData = [
+            ['RESUMEN COMPLETO DE PEDIDOS'],
+            ['Sistema de Gestión de Alimentación - ETECSA Caibarién'],
+            ['Fecha:', new Date().toLocaleDateString()],
+            ['Hora:', new Date().toLocaleTimeString()],
+            [''],
+            ['TOTALES GENERALES'],
+            ['Total Almuerzos Normales:', calculateNormalLunches()],
+            ['Total Almuerzos Mejorados:', calculateImprovedLunches()],
+            ['Total Meriendas:', calculateTotalSnacks()],
+            ['Presupuesto Total:', `$${calculateTotalBudget().toFixed(2)}`],
+            ['Gasto Total en Alimentos:', `$${calculateTotalFoodExpense().toFixed(2)}`],
+            ['Saldo Restante:', `$${calculateTotalRemaining().toFixed(2)}`],
+            [''],
+            ['RESUMEN POR TIENDA'],
+            ['Tienda', 'Productos', 'Cantidad Total', 'Importe Total']
+        ];
+        
+        const totalKaniki = productosKaniki.reduce((sum, p) => sum + p.total, 0);
+        const totalCantKaniki = productosKaniki.reduce((sum, p) => sum + p.quantity, 0);
+        
+        const totalPuntaBrava = productosPuntaBrava.reduce((sum, p) => sum + p.total, 0);
+        const totalCantPuntaBrava = productosPuntaBrava.reduce((sum, p) => sum + p.quantity, 0);
+        
+        resumenData.push(['Kaniki', productosKaniki.length, totalCantKaniki, totalKaniki]);
+        resumenData.push(['Punta Brava', productosPuntaBrava.length, totalCantPuntaBrava, totalPuntaBrava]);
+        resumenData.push(['TOTAL', productosKaniki.length + productosPuntaBrava.length, 
+                         totalCantKaniki + totalCantPuntaBrava, totalKaniki + totalPuntaBrava]);
+        
+        const ws1 = XLSX.utils.aoa_to_sheet(resumenData);
+        
+        // Aplicar estilos a la hoja 1
+        const ws1Range = XLSX.utils.decode_range(ws1['!ref']);
+        for(let R = ws1Range.s.r; R <= ws1Range.e.r; ++R) {
+            for(let C = ws1Range.s.c; C <= ws1Range.e.c; ++C) {
+                const cell_address = {c: C, r: R};
+                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                
+                if (!ws1[cell_ref]) continue;
+                
+                // Bordes para todas las celdas
+                ws1[cell_ref].s = {
+                    border: {
+                        top: {style: 'thin', color: {rgb: "000000"}},
+                        bottom: {style: 'thin', color: {rgb: "000000"}},
+                        left: {style: 'thin', color: {rgb: "000000"}},
+                        right: {style: 'thin', color: {rgb: "000000"}}
+                    }
+                };
+                
+                // Títulos en negrita
+                if (R === 0 || R === 1 || R === 5 || R === 13) {
+                    ws1[cell_ref].s.font = { bold: true, size: 14 };
+                    ws1[cell_ref].s.alignment = { horizontal: 'center' };
+                }
+                
+                // Encabezados de tabla
+                if (R === 14) {
+                    ws1[cell_ref].s.font = { bold: true };
+                    ws1[cell_ref].s.fill = {
+                        fgColor: {rgb: "366092"} // Azul oscuro
+                    };
+                    ws1[cell_ref].s.color = {rgb: "FFFFFF"};
+                }
+                
+                // Filas de totales
+                if (R >= resumenData.length - 3) {
+                    ws1[cell_ref].s.font = { bold: true };
+                    if (R === resumenData.length - 1) {
+                        ws1[cell_ref].s.fill = {
+                            fgColor: {rgb: "C5D9F1"} // Azul claro
+                        };
+                    }
+                }
+                
+                // Formato de moneda para columnas de importe
+                if (C === 3 && R >= 15 && R <= resumenData.length - 1) {
+                    ws1[cell_ref].s.numFmt = '"$"#,##0.00';
+                }
+                
+                // Formato de número para cantidades
+                if (C === 2 && R >= 15 && R <= resumenData.length - 1) {
+                    ws1[cell_ref].s.numFmt = '#,##0';
+                }
+            }
+        }
+        
+        // Ajustar ancho de columnas
+        ws1['!cols'] = [
+            {wch: 25}, // Tienda
+            {wch: 12}, // Productos
+            {wch: 15}, // Cantidad
+            {wch: 18}  // Importe
+        ];
+        
+        XLSX.utils.book_append_sheet(wb, ws1, "Resumen General");
+        
+        // Hoja 2: Productos Kaniki
+        const kanikiData = [
+            ['RESUMEN DE PEDIDOS - KANIKI'],
+            ['Fecha:', new Date().toLocaleDateString()],
+            [''],
+            ['No', 'Producto', 'Precio Unitario', 'Cantidad Pedida', 'Importe Total']
+        ];
+        
+        productosKaniki.forEach(p => {
+            kanikiData.push([p.no, p.name, p.price, p.quantity, p.total]);
+        });
+        
+        kanikiData.push(['', 'TOTAL KANIKI', '', totalCantKaniki, totalKaniki]);
+        
+        const ws2 = XLSX.utils.aoa_to_sheet(kanikiData);
+        
+        // Hoja 3: Productos Punta Brava
+        const puntabravaData = [
+            ['RESUMEN DE PEDIDOS - PUNTA BRAVA'],
+            ['Fecha:', new Date().toLocaleDateString()],
+            [''],
+            ['No', 'Producto', 'Precio Unitario', 'Cantidad Pedida', 'Importe Total']
+        ];
+        
+        productosPuntaBrava.forEach(p => {
+            puntabravaData.push([p.no, p.name, p.price, p.quantity, p.total]);
+        });
+        
+        puntabravaData.push(['', 'TOTAL PUNTA BRAVA', '', totalCantPuntaBrava, totalPuntaBrava]);
+        
+        const ws3 = XLSX.utils.aoa_to_sheet(puntabravaData);
+        
+        // Hoja 4: Detalle por Trabajador
+        const detalleData = [
+            ['DETALLE DE PEDIDOS POR TRABAJADOR'],
+            ['Fecha:', new Date().toLocaleDateString()],
+            [''],
+            ['Trabajador', 'Tienda', 'Producto', 'Cantidad', 'Precio Unitario', 'Subtotal']
+        ];
+        
+        workers.forEach(worker => {
+            worker.foods.forEach(food => {
+                const foodInfo = foodsCatalog.find(f => f.id === food.id);
+                if (foodInfo) {
+                    detalleData.push([
+                        `${worker.name} ${worker.surname}`,
+                        getStoreDisplayName(foodInfo.store),
+                        food.name,
+                        food.quantity,
+                        food.price,
+                        food.quantity * food.price
+                    ]);
+                }
+            });
+        });
+        
+        const ws4 = XLSX.utils.aoa_to_sheet(detalleData);
+        
+        // Agregar hojas al workbook
+        XLSX.utils.book_append_sheet(wb, ws2, "Pedidos Kaniki");
+        XLSX.utils.book_append_sheet(wb, ws3, "Pedidos Punta Brava");
+        XLSX.utils.book_append_sheet(wb, ws4, "Detalle por Trabajador");
+        
+        XLSX.writeFile(wb, `Resumen_Pedidos_Empresa_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showStatus('✅ Resumen completo de pedidos para la empresa exportado', 'success');
+    } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+    }
+}
+
 // ==================== FUNCIONES DE INTERFAZ ====================
 
 // Mostrar mensajes de estado
@@ -1251,15 +1125,6 @@ function showStatus(message, type) {
     setTimeout(() => {
         statusElement.style.display = 'none';
     }, 5000);
-}
-
-// Restablecer datos
-function resetData() {
-    if (confirm('⚠️ ¿Estás seguro de que quieres restablecer todos los datos?\n\nSe perderá toda la información actual y se cargarán datos de ejemplo.')) {
-        localStorage.removeItem('foodManagementData');
-        initializeWithSampleData();
-        showStatus('✅ Datos restablecidos correctamente', 'success');
-    }
 }
 
 // ==================== FUNCIONES DE RENDERIZADO ====================
@@ -1331,28 +1196,33 @@ function renderFoodsCatalog() {
     foodsCatalogList.innerHTML = '';
     
     foodsCatalog.forEach(food => {
-        const usage = calculateFoodUsage(food.id);
-        const categoryInfo = foodCategories[food.category] || foodCategories.otros;
-        
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${food.id}</td>
             <td><strong>${food.name}</strong></td>
+            <td>$${food.price.toFixed(2)}</td>
             <td>
-                <span class="category-badge" style="background-color: ${categoryInfo.color}20; color: ${categoryInfo.color}; border: 1px solid ${categoryInfo.color}40;">
-                    ${categoryInfo.name}
+                <span class="store-badge ${food.store}">
+                    ${getStoreDisplayName(food.store)}
                 </span>
             </td>
-            <td>$${usage.averagePrice.toFixed(2)}</td>
             <td>
-                <button class="btn-danger" data-id="${food.id}">🗑️ Eliminar</button>
+                <button class="btn-edit btn-sm" data-id="${food.id}">✏️ Editar</button>
+                <button class="btn-danger btn-sm" data-id="${food.id}">🗑️ Eliminar</button>
             </td>
         `;
         
         foodsCatalogList.appendChild(row);
     });
     
-    // Event listeners para botones de eliminar alimentos
+    // Event listeners para botones de alimentos
+    document.querySelectorAll('#foods-catalog-list .btn-edit').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const foodId = parseInt(this.dataset.id);
+            openFoodCatalogModal(foodId);
+        });
+    });
+    
     document.querySelectorAll('#foods-catalog-list .btn-danger').forEach(btn => {
         btn.addEventListener('click', function() {
             const foodId = parseInt(this.dataset.id);
@@ -1369,15 +1239,44 @@ function updateFoodSelect() {
     const foodSelect = document.getElementById('food-select');
     foodSelect.innerHTML = '';
     
+    // Agrupar alimentos por nombre (puede haber mismo alimento en diferentes tiendas)
+    const alimentosAgrupados = {};
+    
     foodsCatalog.forEach(food => {
-        const option = document.createElement('option');
-        option.value = food.id;
-        option.textContent = `${food.name} (${getCategoryDisplayName(food.category)})`;
-        foodSelect.appendChild(option);
+        if (!alimentosAgrupados[food.name]) {
+            alimentosAgrupados[food.name] = [];
+        }
+        alimentosAgrupados[food.name].push(food);
     });
+    
+    // Crear opciones
+    for (const nombre in alimentosAgrupados) {
+        const alimentos = alimentosAgrupados[nombre];
+        
+        if (alimentos.length === 1) {
+            // Solo una opción
+            const food = alimentos[0];
+            const option = document.createElement('option');
+            option.value = food.id;
+            option.textContent = `${food.name} - $${food.price.toFixed(2)} (${getStoreDisplayName(food.store)})`;
+            option.dataset.price = food.price;
+            option.dataset.store = food.store;
+            foodSelect.appendChild(option);
+        } else {
+            // Múltiples opciones (diferentes tiendas/precios)
+            alimentos.forEach(food => {
+                const option = document.createElement('option');
+                option.value = food.id;
+                option.textContent = `${food.name} - $${food.price.toFixed(2)} (${getStoreDisplayName(food.store)})`;
+                option.dataset.price = food.price;
+                option.dataset.store = food.store;
+                foodSelect.appendChild(option);
+            });
+        }
+    }
 }
 
-// Mostrar detalles del trabajador
+// Mostrar detalles del trabajador CON BOTÓN DE RESET
 function showWorkerDetails(workerId) {
     const worker = workers.find(w => w.id === workerId);
     if (!worker) return;
@@ -1387,9 +1286,6 @@ function showWorkerDetails(workerId) {
     // Mostrar sección de detalles
     const workerDetails = document.getElementById('worker-details');
     workerDetails.style.display = 'block';
-    
-    // Scroll a la sección de detalles
-    workerDetails.scrollIntoView({ behavior: 'smooth', block: 'start' });
     
     // Actualizar información del trabajador
     const workerInfo = document.getElementById('worker-info');
@@ -1436,6 +1332,17 @@ function showWorkerDetails(workerId) {
                 <div class="progress-fill" style="width: ${Math.min(percentUsed, 100)}%"></div>
             </div>
         </div>
+        <div class="reset-confirmation" id="reset-confirmation">
+            <p><strong>⚠️ ¿Estás seguro de que quieres eliminar TODOS los alimentos de este trabajador?</strong></p>
+            <p>Esta acción eliminará ${worker.foods.length} alimentos de la lista.</p>
+            <div style="margin-top: 10px;">
+                <button id="confirm-reset" class="btn-danger">✅ Sí, eliminar todos</button>
+                <button id="cancel-reset" class="btn-info">❌ Cancelar</button>
+            </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+            <button id="reset-foods-btn" class="btn-reset">🗑️ Vaciar Lista de Alimentos</button>
+        </div>
     `;
     
     // Renderizar lista de alimentos del trabajador
@@ -1443,9 +1350,26 @@ function showWorkerDetails(workerId) {
     
     // Actualizar resumen
     updateWorkerSummary(worker);
+    
+    // Agregar event listener para el botón de reset
+    document.getElementById('reset-foods-btn').addEventListener('click', function() {
+        if (worker.foods.length > 0) {
+            document.getElementById('reset-confirmation').style.display = 'block';
+        } else {
+            showStatus('ℹ️ Este trabajador no tiene alimentos en la lista', 'info');
+        }
+    });
+    
+    document.getElementById('confirm-reset').addEventListener('click', function() {
+        resetWorkerFoods(worker);
+    });
+    
+    document.getElementById('cancel-reset').addEventListener('click', function() {
+        document.getElementById('reset-confirmation').style.display = 'none';
+    });
 }
 
-// Renderizar alimentos de un trabajador CON TIENDA
+// Renderizar alimentos de un trabajador
 function renderWorkerFoods(worker) {
     const foodList = document.getElementById('food-list');
     foodList.innerHTML = '';
@@ -1455,7 +1379,7 @@ function renderWorkerFoods(worker) {
     worker.foods.forEach((food, index) => {
         const subtotal = food.quantity * food.price;
         total += subtotal;
-        const storeName = food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava';
+        const storeName = getStoreDisplayName(food.store);
         
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -1509,7 +1433,7 @@ function updateWorkerSummary(worker) {
     }
 }
 
-// Actualizar resumen general CON NUEVA ESTRUCTURA
+// Actualizar resumen general
 function updateSummary() {
     // Actualizar estadísticas generales
     const totalWorkers = workers.length;
@@ -1533,13 +1457,12 @@ function updateSummary() {
         
         const workerFoodExpense = calculateWorkerFoodExpense(worker);
         const remaining = workerBudget - workerFoodExpense;
-        const percentUsed = workerBudget > 0 ? ((workerFoodExpense / workerBudget) * 100) : 0;
         
         // Si el trabajador tiene alimentos
         if (worker.foods.length > 0) {
             worker.foods.forEach((food, index) => {
                 const subtotal = food.quantity * food.price;
-                const storeName = food.store === 'kaniki' ? 'Kaniki' : 'Punta Brava';
+                const storeName = getStoreDisplayName(food.store);
                 
                 const row = document.createElement('tr');
                 
@@ -1551,15 +1474,12 @@ function updateSummary() {
                             <span class="diet-badge ${worker.diet}">${getDietDisplayName(worker.diet)}</span>
                         </td>
                         <td>${worker.days}</td>
-                        <td>${worker.snacks || 0}</td>
                         <td>$${workerBudget.toFixed(2)}</td>
                         <td class="${remaining >= 0 ? 'positive' : 'negative'}">
-                            $${remaining.toFixed(2)}<br>
-                            <small>(${percentUsed.toFixed(1)}% usado)</small>
+                            $${remaining.toFixed(2)}
                         </td>
                         <td>${food.name}</td>
                         <td>${food.quantity}</td>
-                        <td>$${food.price.toFixed(2)}</td>
                         <td>$${subtotal.toFixed(2)}</td>
                         <td>${storeName}</td>
                     `;
@@ -1567,15 +1487,12 @@ function updateSummary() {
                     // Filas siguientes del mismo trabajador - solo mostrar detalles del alimento
                     row.innerHTML = `
                         <td>${worker.days}</td>
-                        <td>${worker.snacks || 0}</td>
                         <td>$${workerBudget.toFixed(2)}</td>
                         <td class="${remaining >= 0 ? 'positive' : 'negative'}">
-                            $${remaining.toFixed(2)}<br>
-                            <small>(${percentUsed.toFixed(1)}% usado)</small>
+                            $${remaining.toFixed(2)}
                         </td>
                         <td>${food.name}</td>
                         <td>${food.quantity}</td>
-                        <td>$${food.price.toFixed(2)}</td>
                         <td>$${subtotal.toFixed(2)}</td>
                         <td>${storeName}</td>
                     `;
@@ -1592,10 +1509,9 @@ function updateSummary() {
                     <span class="diet-badge ${worker.diet}">${getDietDisplayName(worker.diet)}</span>
                 </td>
                 <td>${worker.days}</td>
-                <td>${worker.snacks || 0}</td>
                 <td>$${workerBudget.toFixed(2)}</td>
                 <td class="positive">$${remaining.toFixed(2)}</td>
-                <td colspan="5" class="no-foods">Sin alimentos registrados</td>
+                <td colspan="4" class="no-foods">Sin alimentos registrados</td>
             `;
             summaryList.appendChild(row);
         }
@@ -1717,29 +1633,64 @@ function deleteWorker(workerId) {
     }
 }
 
-// Abrir modal para añadir alimento al catálogo
-function openFoodCatalogModal() {
+// Abrir modal para añadir/editar alimento al catálogo
+function openFoodCatalogModal(foodId = null) {
     const modal = document.getElementById('food-catalog-modal');
+    const title = document.getElementById('food-catalog-modal-title');
+    const form = document.getElementById('food-catalog-form');
+    
+    if (foodId) {
+        // Modo edición
+        title.textContent = '✏️ Editar Alimento';
+        const food = foodsCatalog.find(f => f.id === foodId);
+        
+        if (food) {
+            document.getElementById('food-catalog-id').value = food.id;
+            document.getElementById('food-catalog-name').value = food.name;
+            document.getElementById('food-catalog-price').value = food.price;
+            document.getElementById('food-catalog-store').value = food.store;
+        }
+    } else {
+        // Modo añadir
+        title.textContent = '➕ Añadir Alimento al Catálogo';
+        form.reset();
+        document.getElementById('food-catalog-id').value = '';
+    }
+    
     modal.style.display = 'flex';
 }
 
-// Guardar alimento en el catálogo
+// Guardar alimento en el catálogo (añadir o editar)
 function saveFoodCatalog() {
+    const id = document.getElementById('food-catalog-id').value;
     const name = document.getElementById('food-catalog-name').value;
-    const category = document.getElementById('food-catalog-category').value;
+    const price = parseFloat(document.getElementById('food-catalog-price').value);
+    const store = document.getElementById('food-catalog-store').value;
     
-    if (!name) {
-        showStatus('❌ Por favor, introduce el nombre del alimento', 'error');
+    if (!name || !price || price <= 0) {
+        showStatus('❌ Por favor, completa todos los campos correctamente', 'error');
         return;
     }
     
-    const newFood = {
-        id: nextFoodId++,
-        name: name,
-        category: category
-    };
-    
-    foodsCatalog.push(newFood);
+    if (id) {
+        // Editar alimento existente
+        const foodIndex = foodsCatalog.findIndex(f => f.id === parseInt(id));
+        if (foodIndex !== -1) {
+            foodsCatalog[foodIndex].name = name;
+            foodsCatalog[foodIndex].price = price;
+            foodsCatalog[foodIndex].store = store;
+        }
+    } else {
+        // Añadir nuevo alimento
+        const newFood = {
+            id: nextFoodId++,
+            name: name,
+            price: price,
+            store: store
+        };
+        
+        foodsCatalog.push(newFood);
+    }
     
     // Cerrar modal y actualizar interfaz
     document.getElementById('food-catalog-modal').style.display = 'none';
@@ -1747,7 +1698,7 @@ function saveFoodCatalog() {
     renderFoodsCatalog();
     saveDataToLocalStorage();
     
-    showStatus(`✅ Alimento "${name}" añadido al catálogo`, 'success');
+    showStatus(`✅ Alimento "${name}" guardado correctamente`, 'success');
 }
 
 // Eliminar alimento del catálogo
@@ -1778,7 +1729,7 @@ function deleteFoodCatalog(foodId) {
     }
 }
 
-// Añadir alimento a trabajador CON TIENDA
+// Añadir alimento a trabajador
 function addFoodToWorker() {
     if (!currentWorkerId) {
         showStatus('❌ Primero selecciona un trabajador', 'error');
@@ -1788,10 +1739,8 @@ function addFoodToWorker() {
     const foodSelect = document.getElementById('food-select');
     const foodId = parseInt(foodSelect.value);
     const quantity = parseInt(document.getElementById('food-quantity').value);
-    const price = parseFloat(document.getElementById('food-price').value);
-    const store = document.getElementById('food-store').value;
     
-    if (!foodId || !quantity || quantity < 1 || !price || price < 0) {
+    if (!foodId || !quantity || quantity < 1) {
         showStatus('❌ Por favor, completa todos los campos correctamente', 'error');
         return;
     }
@@ -1808,13 +1757,13 @@ function addFoodToWorker() {
         return;
     }
     
-    // Añadir alimento al trabajador con tienda
+    // Añadir alimento al trabajador
     worker.foods.push({
         id: food.id,
         name: food.name,
         quantity: quantity,
-        price: price,
-        store: store
+        price: food.price,
+        store: food.store
     });
     
     // Actualizar interfaz
@@ -1824,7 +1773,6 @@ function addFoodToWorker() {
     
     // Limpiar formulario
     document.getElementById('food-quantity').value = 1;
-    document.getElementById('food-price').value = 0;
     
     showStatus(`✅ "${food.name}" añadido a la lista de compra`, 'success');
 }
@@ -1848,6 +1796,25 @@ function removeFoodFromWorker(foodIndex) {
     showStatus(`✅ "${foodName}" eliminado de la lista de compra`, 'success');
 }
 
+// Resetear todos los alimentos de un trabajador
+function resetWorkerFoods(worker) {
+    if (!worker || !worker.foods || worker.foods.length === 0) return;
+    
+    const foodCount = worker.foods.length;
+    worker.foods = [];
+    
+    // Actualizar interfaz
+    renderWorkerFoods(worker);
+    updateWorkerSummary(worker);
+    updateSummary();
+    saveDataToLocalStorage();
+    
+    // Ocultar confirmación
+    document.getElementById('reset-confirmation').style.display = 'none';
+    
+    showStatus(`✅ Se eliminaron ${foodCount} alimentos de la lista de ${worker.name}`, 'success');
+}
+
 // ==================== FUNCIONES AUXILIARES ====================
 
 // Función auxiliar para mostrar nombre de dieta
@@ -1859,24 +1826,287 @@ function getDietDisplayName(diet) {
     return dietNames[diet] || diet;
 }
 
-// Función auxiliar para mostrar nombre de categoría
-function getCategoryDisplayName(category) {
-    const categoryInfo = foodCategories[category];
-    return categoryInfo ? categoryInfo.name.replace(/[^a-zA-Z\s]/g, '') : 'Otros';
+// Función auxiliar para mostrar nombre de tienda
+function getStoreDisplayName(store) {
+    return storeNames[store] || store;
 }
 
-// ==================== FUNCIONES DE DEPURACIÓN ====================
+// ==================== FUNCIONES DE SEGURIDAD Y BACKUP ====================
 
-// Mostrar información de depuración (opcional)
-function debugInfo() {
-    console.log('=== DEBUG INFO ===');
-    console.log('Total trabajadores:', workers.length);
-    console.log('Total alimentos:', foodsCatalog.length);
-    console.log('Next Worker ID:', nextWorkerId);
-    console.log('Next Food ID:', nextFoodId);
-    console.log('Current Worker ID:', currentWorkerId);
-    console.log('==================');
+// Mostrar indicador de guardado
+function showSaveIndicator(type) {
+    const indicator = document.getElementById('auto-save-indicator');
+    if (!indicator) return;
+    
+    indicator.style.display = 'flex';
+    
+    switch(type) {
+        case 'saving':
+            indicator.innerHTML = '💾 Guardando automáticamente...';
+            indicator.className = 'auto-save-indicator';
+            break;
+        case 'success':
+            indicator.innerHTML = '✅ Datos guardados';
+            indicator.className = 'auto-save-indicator auto-save-success';
+            break;
+        case 'error':
+            indicator.innerHTML = '❌ Error al guardar';
+            indicator.className = 'auto-save-indicator auto-save-error';
+            break;
+    }
 }
 
-// Exportar función de depuración al global scope (opcional)
-window.debugInfo = debugInfo;
+// Ocultar indicador
+function hideSaveIndicator() {
+    const indicator = document.getElementById('auto-save-indicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+// Obtener contador de guardados
+function getSaveCount() {
+    try {
+        const data = localStorage.getItem('foodManagementData');
+        if (data) {
+            const parsed = JSON.parse(data);
+            return parsed.saveCount || 0;
+        }
+    } catch (error) {
+        console.error('Error obteniendo contador:', error);
+    }
+    return 0;
+}
+
+// Recuperar datos desde copia de seguridad
+function restoreFromBackup() {
+    try {
+        const backup = localStorage.getItem('foodManagementBackup');
+        if (backup) {
+            const data = JSON.parse(backup);
+            
+            workers = data.workers || [];
+            foodsCatalog = data.foodsCatalog || [];
+            nextWorkerId = data.nextWorkerId || 1;
+            nextFoodId = data.nextFoodId || 1;
+            
+            renderWorkers();
+            renderFoodsCatalog();
+            updateSummary();
+            
+            showStatus('✅ Datos recuperados desde copia de seguridad', 'success');
+            return true;
+        }
+    } catch (error) {
+        console.error('Error recuperando backup:', error);
+    }
+    return false;
+}
+
+// Verificar integridad de datos
+function verifyDataIntegrity() {
+    try {
+        const data = localStorage.getItem('foodManagementData');
+        if (!data) return false;
+        
+        const parsed = JSON.parse(data);
+        
+        // Verificar estructura básica
+        if (!parsed.workers || !parsed.foodsCatalog) {
+            console.warn('Estructura de datos inválida');
+            return false;
+        }
+        
+        // Verificar que los arrays sean arrays
+        if (!Array.isArray(parsed.workers) || !Array.isArray(parsed.foodsCatalog)) {
+            console.warn('Datos no son arrays');
+            return false;
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.error('Error verificando integridad:', error);
+        return false;
+    }
+}
+
+// Función para exportar backup manual
+function exportBackup() {
+    try {
+        const data = {
+            workers: workers,
+            foodsCatalog: foodsCatalog,
+            nextWorkerId: nextWorkerId,
+            nextFoodId: nextFoodId,
+            exportDate: new Date().toISOString(),
+            exportType: 'backup'
+        };
+        
+        const jsonStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `backup_alimentacion_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showStatus('✅ Copia de seguridad exportada', 'success');
+    } catch (error) {
+        showStatus('❌ Error exportando backup: ' + error.message, 'error');
+    }
+}
+
+// ==================== CONFIGURACIÓN DE EVENTOS ====================
+
+// Configurar event listeners
+function setupEventListeners() {
+    // Tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            this.classList.add('active');
+            document.getElementById(this.dataset.tab + '-tab').classList.add('active');
+        });
+    });
+    
+    // Botón añadir trabajador
+    document.getElementById('add-worker-btn').addEventListener('click', function() {
+        openWorkerModal();
+    });
+    
+    // Botón añadir alimento al catálogo
+    document.getElementById('add-food-catalog-btn').addEventListener('click', function() {
+        openFoodCatalogModal();
+    });
+    
+    // Formulario trabajador
+    document.getElementById('worker-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveWorker();
+    });
+    
+    // Formulario alimento catálogo
+    document.getElementById('food-catalog-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveFoodCatalog();
+    });
+    
+    // Botón añadir alimento a trabajador
+    document.getElementById('add-food-btn').addEventListener('click', function() {
+        addFoodToWorker();
+    });
+    
+    // Botones de importación/exportación Excel
+    document.getElementById('import-workers-excel-btn').addEventListener('click', function() {
+        document.getElementById('import-file').setAttribute('data-type', 'workers-excel');
+        document.getElementById('import-file').click();
+    });
+    
+    document.getElementById('import-foods-excel-btn').addEventListener('click', function() {
+        document.getElementById('import-file').setAttribute('data-type', 'foods-excel');
+        document.getElementById('import-file').click();
+    });
+    
+    document.getElementById('export-excel-btn').addEventListener('click', function() {
+        exportAllToExcel();
+    });
+    
+    document.getElementById('export-resumen-pedidos-btn').addEventListener('click', function() {
+        exportResumenPedidosEmpresa();
+    });
+    
+    // Botones de plantillas
+    document.getElementById('download-template-btn').addEventListener('click', function() {
+        downloadExcelTemplates();
+    });
+    
+    // Botones de exportación específicos
+    document.getElementById('export-full-excel-btn').addEventListener('click', function() {
+        exportFullReportToExcel();
+    });
+    
+    document.getElementById('export-factura-excel-btn').addEventListener('click', function() {
+        exportFacturaExcel();
+    });
+    
+    document.getElementById('export-caniki-excel-btn').addEventListener('click', function() {
+        exportProductosCanikiExcel();
+    });
+    
+    document.getElementById('export-puntabrava-excel-btn').addEventListener('click', function() {
+        exportProductosPuntaBravaExcel();
+    });
+    
+    // Botón para exportar resumen de pedidos (versión 2 - desde pestaña Excel)
+    document.getElementById('export-resumen-pedidos-btn2').addEventListener('click', function() {
+        exportResumenPedidosEmpresa();
+    });
+    
+    // Botón de backup
+    document.getElementById('backup-btn').addEventListener('click', exportBackup);
+    
+    // Botones de importación Excel desde la pestaña Excel
+    document.querySelectorAll('.import-excel-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const type = this.getAttribute('data-type');
+            document.getElementById('import-file').setAttribute('data-type', type + '-excel');
+            document.getElementById('import-file').click();
+        });
+    });
+    
+    document.getElementById('import-file').addEventListener('change', function(e) {
+        importData(e);
+    });
+    
+    // Cerrar modales
+    document.querySelectorAll('.close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', function() {
+            this.closest('.modal').style.display = 'none';
+        });
+    });
+    
+    // Cerrar modales al hacer clic fuera
+    window.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal')) {
+            e.target.style.display = 'none';
+        }
+    });
+}
+
+// ==================== GUARDADO PERIÓDICO ====================
+
+// Guardado periódico cada 30 segundos (como respaldo extra)
+function setupPeriodicSave() {
+    setInterval(() => {
+        if (!isSaving) {
+            console.log('🔄 Guardado periódico automático...');
+            saveDataToLocalStorage();
+        }
+    }, 30000); // 30 segundos
+}
+
+// ==================== DETECCIÓN DE CIERRE DEL NAVEGADOR ====================
+
+// Guardar datos cuando el usuario cierre la pestaña/navegador
+function setupBeforeUnload() {
+    window.addEventListener('beforeunload', function(event) {
+        if (!isSaving) {
+            console.log('⚠️ Usuario cerrando página, guardando datos...');
+            saveDataToLocalStorage();
+        }
+    });
+    
+    // También guardar cuando se cambia de pestaña
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && !isSaving) {
+            console.log('🔄 Pestaña oculta, guardando datos...');
+            saveDataToLocalStorage();
+        }
+    });
+}
