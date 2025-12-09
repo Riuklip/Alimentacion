@@ -8,7 +8,8 @@ let nextFoodId = 1;
 // Precios por tipo de alimentación (en pesos)
 const dietPrices = {
     normal: 400,
-    mejorada: 500
+    mejorada: 500,
+    estimulo: 0 // Se maneja de forma diferente
 };
 
 // Nombres de tiendas
@@ -110,9 +111,11 @@ function initializeWithSampleData() {
             name: "Juan", 
             surname: "García Pérez", 
             diet: "normal", 
-            days: 20, 
+            kanikiDays: 15,
+            puntabravaDays: 5,
             snacks: 10, 
-            snackPrice: 50, 
+            snackPrice: 50,
+            stimulusBalance: 0,
             foods: [
                 { id: 1, name: "Aceite", quantity: 2, price: 850, store: "kaniki" },
                 { id: 3, name: "Pollo Pqte 2Kg", quantity: 1, price: 1650, store: "kaniki" }
@@ -123,13 +126,27 @@ function initializeWithSampleData() {
             name: "María", 
             surname: "López Rodríguez", 
             diet: "mejorada", 
-            days: 18, 
+            kanikiDays: 10,
+            puntabravaDays: 8,
             snacks: 8, 
-            snackPrice: 50, 
+            snackPrice: 50,
+            stimulusBalance: 0,
             foods: [
                 { id: 2, name: "Frijoles Negros", quantity: 3, price: 380, store: "kaniki" },
                 { id: 5, name: "Leche Condensada Silver Food", quantity: 2, price: 470, store: "kaniki" }
             ]
+        },
+        { 
+            id: 3, 
+            name: "Carlos", 
+            surname: "Martínez", 
+            diet: "estimulo", 
+            kanikiDays: 0,
+            puntabravaDays: 0,
+            snacks: 0, 
+            snackPrice: 0,
+            stimulusBalance: 1000,
+            foods: []
         }
     ];
     
@@ -144,7 +161,7 @@ function initializeWithSampleData() {
         { id: 8, name: "Pelly", price: 200, store: "punta_brava" }
     ];
     
-    nextWorkerId = 3;
+    nextWorkerId = 4;
     nextFoodId = 9;
     
     renderWorkers();
@@ -213,10 +230,10 @@ function downloadExcelTemplates() {
     try {
         // Plantilla de trabajadores
         const workersTemplate = [
-            ['Nombre', 'Apellidos', 'TipoDieta', 'DiasTrabajados', 'Meriendas', 'PrecioMerienda'],
-            ['Juan', 'García Pérez', 'normal', '20', '10', '50'],
-            ['María', 'López Rodríguez', 'mejorada', '18', '8', '50'],
-            ['Carlos', 'Martínez Sánchez', 'normal', '22', '15', '50']
+            ['Nombre', 'Apellidos', 'TipoDieta', 'DiasKaniki', 'DiasPuntaBrava', 'Meriendas', 'PrecioMerienda', 'Estímulo'],
+            ['Juan', 'García Pérez', 'normal', '15', '5', '10', '50', ''],
+            ['María', 'López Rodríguez', 'mejorada', '10', '8', '8', '50', ''],
+            ['Carlos', 'Martínez', 'estimulo', '', '', '', '', '1000']
         ];
         
         // Plantilla de alimentos
@@ -284,7 +301,7 @@ function importData(event) {
     event.target.value = '';
 }
 
-// Importar trabajadores desde Excel (CORREGIDO)
+// Importar trabajadores desde Excel (MODIFICADO PARA NUEVOS CAMPOS)
 function importWorkersFromExcel(workbook) {
     try {
         // Buscar la hoja "Trabajadores" por nombre
@@ -299,7 +316,7 @@ function importWorkersFromExcel(workbook) {
         const newWorkers = [];
         const headers = data[0] || [];
         
-        // Encontrar índices de columnas (más robusto)
+        // Encontrar índices de columnas
         const nameIndex = headers.findIndex(h => 
             h && h.toString().toLowerCase().includes('nombre')
         );
@@ -310,15 +327,23 @@ function importWorkersFromExcel(workbook) {
             h && h.toString().toLowerCase().includes('dieta') ||
             h && h.toString().toLowerCase().includes('tipo')
         );
-        const daysIndex = headers.findIndex(h => 
-            h && h.toString().toLowerCase().includes('día') ||
-            h && h.toString().toLowerCase().includes('dia')
+        const kanikiDaysIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('kaniki') ||
+            h && h.toString().toLowerCase().includes('díaskaniki')
+        );
+        const puntabravaDaysIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('puntabrava') ||
+            h && h.toString().toLowerCase().includes('punta brava')
         );
         const snacksIndex = headers.findIndex(h => 
             h && h.toString().toLowerCase().includes('merienda')
         );
         const snackPriceIndex = headers.findIndex(h => 
             h && h.toString().toLowerCase().includes('precio')
+        );
+        const stimulusIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('estímulo') ||
+            h && h.toString().toLowerCase().includes('estimulo')
         );
         
         // Procesar filas de datos
@@ -334,14 +359,25 @@ function importWorkersFromExcel(workbook) {
                 name: (row[nameIndex] || '').toString().trim(),
                 surname: (row[surnameIndex] || '').toString().trim(),
                 diet: (row[dietIndex] || 'normal').toString().toLowerCase(),
-                days: parseInt(row[daysIndex]) || 0,
+                kanikiDays: parseInt(row[kanikiDaysIndex]) || 0,
+                puntabravaDays: parseInt(row[puntabravaDaysIndex]) || 0,
                 snacks: parseInt(row[snacksIndex]) || 0,
                 snackPrice: parseFloat(row[snackPriceIndex]) || 50,
+                stimulusBalance: parseFloat(row[stimulusIndex]) || 0,
                 foods: []
             };
             
+            // Si tiene estímulo pero no está marcado como dieta estímulo, corregir
+            if (worker.stimulusBalance > 0 && worker.diet !== 'estimulo') {
+                worker.diet = 'estimulo';
+                worker.kanikiDays = 0;
+                worker.puntabravaDays = 0;
+                worker.snacks = 0;
+                worker.snackPrice = 0;
+            }
+            
             // Validar dieta
-            if (worker.diet !== 'normal' && worker.diet !== 'mejorada') {
+            if (!['normal', 'mejorada', 'estimulo'].includes(worker.diet)) {
                 worker.diet = 'normal';
             }
             
@@ -360,7 +396,7 @@ function importWorkersFromExcel(workbook) {
     }
 }
 
-// Importar alimentos desde Excel (CORREGIDO)
+// Importar alimentos desde Excel (sin cambios)
 function importFoodsFromExcel(workbook) {
     try {
         // Buscar la hoja "Alimentos" por nombre
@@ -422,7 +458,7 @@ function importFoodsFromExcel(workbook) {
     }
 }
 
-// Exportar todos los datos a Excel (archivo completo)
+// Exportar todos los datos a Excel (archivo completo MODIFICADO)
 function exportAllToExcel() {
     try {
         // Crear workbook con múltiples hojas
@@ -430,13 +466,21 @@ function exportAllToExcel() {
         
         // Hoja 1: Trabajadores
         const workersData = [
-            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días Trabajados', 'Meriendas', 'Precio Merienda', 'Presupuesto Diario', 'Presupuesto Total', 'Gasto Alimentos', 'Saldo Restante']
+            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días Kaniki', 'Días Punta Brava', 'Meriendas', 'Precio Merienda', 'Estímulo', 'Presupuesto Total', 'Gasto Alimentos', 'Saldo Restante']
         ];
         
         workers.forEach(worker => {
-            const dailyBudget = dietPrices[worker.diet] || 0;
-            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-            const totalBudget = (dailyBudget * worker.days) + snackBudget;
+            let totalBudget = 0;
+            
+            if (worker.diet === 'estimulo') {
+                totalBudget = worker.stimulusBalance || 0;
+            } else {
+                const dailyBudget = dietPrices[worker.diet] || 0;
+                const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
+                const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+                totalBudget = (dailyBudget * totalDays) + snackBudget;
+            }
+            
             const foodExpense = calculateWorkerFoodExpense(worker);
             const remaining = totalBudget - foodExpense;
             
@@ -444,10 +488,11 @@ function exportAllToExcel() {
                 worker.name,
                 worker.surname,
                 getDietDisplayName(worker.diet),
-                worker.days,
-                worker.snacks || 0,
-                `$${(worker.snackPrice || 50).toFixed(2)}`,
-                `$${dailyBudget.toFixed(2)}`,
+                worker.diet === 'estimulo' ? '-' : (worker.kanikiDays || 0),
+                worker.diet === 'estimulo' ? '-' : (worker.puntabravaDays || 0),
+                worker.diet === 'estimulo' ? '-' : (worker.snacks || 0),
+                worker.diet === 'estimulo' ? '-' : `$${(worker.snackPrice || 50).toFixed(2)}`,
+                worker.diet === 'estimulo' ? `$${(worker.stimulusBalance || 0).toFixed(2)}` : '-',
                 `$${totalBudget.toFixed(2)}`,
                 `$${foodExpense.toFixed(2)}`,
                 `$${remaining.toFixed(2)}`
@@ -456,7 +501,7 @@ function exportAllToExcel() {
         
         const ws1 = XLSX.utils.aoa_to_sheet(workersData);
         
-        // Hoja 2: Alimentos
+        // Hoja 2: Alimentos (sin cambios)
         const foodsData = [
             ['ID', 'Nombre', 'Precio', 'Tienda']
         ];
@@ -472,7 +517,7 @@ function exportAllToExcel() {
         
         const ws2 = XLSX.utils.aoa_to_sheet(foodsData);
         
-        // Hoja 3: Compras por trabajador
+        // Hoja 3: Compras por trabajador (sin cambios)
         const purchasesData = [
             ['Trabajador', 'Alimento', 'Cantidad', 'Precio Unitario', 'Subtotal', 'Tienda']
         ];
@@ -507,7 +552,7 @@ function exportAllToExcel() {
     }
 }
 
-// Exportar reporte completo
+// Exportar reporte completo (MODIFICADO)
 function exportFullReportToExcel() {
     try {
         const wb = XLSX.utils.book_new();
@@ -522,13 +567,21 @@ function exportFullReportToExcel() {
             ['Saldo Total Restante', `$${calculateTotalRemaining().toFixed(2)}`],
             [''],
             ['DETALLE POR TRABAJADOR'],
-            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días', 'Presupuesto', 'Gasto', 'Saldo', 'Alimentos Comprados']
+            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días Kaniki', 'Días Punta Brava', 'Estímulo', 'Presupuesto', 'Gasto', 'Saldo', 'Alimentos Comprados']
         ];
         
         workers.forEach(worker => {
-            const dailyBudget = dietPrices[worker.diet] || 0;
-            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-            const totalBudget = (dailyBudget * worker.days) + snackBudget;
+            let totalBudget = 0;
+            
+            if (worker.diet === 'estimulo') {
+                totalBudget = worker.stimulusBalance || 0;
+            } else {
+                const dailyBudget = dietPrices[worker.diet] || 0;
+                const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
+                const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+                totalBudget = (dailyBudget * totalDays) + snackBudget;
+            }
+            
             const foodExpense = calculateWorkerFoodExpense(worker);
             const remaining = totalBudget - foodExpense;
             
@@ -546,7 +599,9 @@ function exportFullReportToExcel() {
                 worker.name,
                 worker.surname,
                 getDietDisplayName(worker.diet),
-                worker.days,
+                worker.diet === 'estimulo' ? '-' : (worker.kanikiDays || 0),
+                worker.diet === 'estimulo' ? '-' : (worker.puntabravaDays || 0),
+                worker.diet === 'estimulo' ? `$${(worker.stimulusBalance || 0).toFixed(2)}` : '-',
                 `$${totalBudget.toFixed(2)}`,
                 `$${foodExpense.toFixed(2)}`,
                 `$${remaining.toFixed(2)}`,
@@ -566,23 +621,24 @@ function exportFullReportToExcel() {
 
 // ==================== FUNCIONES DE CÁLCULO MEJORADAS ====================
 
-// Calcular total de almuerzos normales
+// Calcular total de almuerzos normales (MODIFICADO)
 function calculateNormalLunches() {
     return workers
         .filter(worker => worker.diet === 'normal')
-        .reduce((total, worker) => total + (worker.days || 0), 0);
+        .reduce((total, worker) => total + (worker.kanikiDays || 0) + (worker.puntabravaDays || 0), 0);
 }
 
-// Calcular total de almuerzos mejorados
+// Calcular total de almuerzos mejorados (MODIFICADO)
 function calculateImprovedLunches() {
     return workers
         .filter(worker => worker.diet === 'mejorada')
-        .reduce((total, worker) => total + (worker.days || 0), 0);
+        .reduce((total, worker) => total + (worker.kanikiDays || 0) + (worker.puntabravaDays || 0), 0);
 }
 
 // Calcular total de meriendas
 function calculateTotalSnacks() {
     return workers
+        .filter(worker => worker.diet !== 'estimulo')
         .reduce((total, worker) => total + (worker.snacks || 0), 0);
 }
 
@@ -591,12 +647,17 @@ function calculateWorkerFoodExpense(worker) {
     return worker.foods.reduce((total, food) => total + (food.quantity * food.price), 0);
 }
 
-// Calcular presupuesto total
+// Calcular presupuesto total (MODIFICADO)
 function calculateTotalBudget() {
     return workers.reduce((total, worker) => {
-        const dailyBudget = dietPrices[worker.diet] || 0;
-        const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-        return total + (dailyBudget * worker.days) + snackBudget;
+        if (worker.diet === 'estimulo') {
+            return total + (worker.stimulusBalance || 0);
+        } else {
+            const dailyBudget = dietPrices[worker.diet] || 0;
+            const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
+            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+            return total + (dailyBudget * totalDays) + snackBudget;
+        }
     }, 0);
 }
 
@@ -610,36 +671,50 @@ function calculateTotalRemaining() {
     return calculateTotalBudget() - calculateTotalFoodExpense();
 }
 
+// Calcular días totales por empresa (NUEVA FUNCIÓN)
+function calculateTotalDaysByStore(store) {
+    return workers
+        .filter(worker => worker.diet !== 'estimulo')
+        .reduce((total, worker) => {
+            if (store === 'kaniki') {
+                return total + (worker.kanikiDays || 0);
+            } else if (store === 'punta_brava') {
+                return total + (worker.puntabravaDays || 0);
+            }
+            return total;
+        }, 0);
+}
+
 // ==================== FUNCIONES DE EXPORTACIÓN MEJORADAS ====================
 
-// Exportar Factura en formato específico MEJORADO
-function exportFacturaExcel() {
+// Exportar Factura General MEJORADO
+function exportFacturaGeneralExcel() {
     try {
         const wb = XLSX.utils.book_new();
         
-        // Calcular totales
+        // Calcular totales generales
         const normalLunches = calculateNormalLunches();
         const improvedLunches = calculateImprovedLunches();
         const totalSnacks = calculateTotalSnacks();
         
         // Crear hoja con formato de factura mejorada
         const facturaData = [
-            ['', '', '', '', 'Factura No:', ''],
+            ['', '', '', '', 'Factura General No:', ''],
             ['', '', '', '', '', ''],
             ['', '', '', '', '', ''],
             ['', '', '', '', '', ''],
             ['No.', 'Descripción', 'U/M', 'Cantidad', 'Precio CUP', 'Importe'],
-            ['1', 'ALMUERZOS', 'U', normalLunches, '400', normalLunches * 400],
+            ['1', 'ALMUERZOS GENERALES', 'U', normalLunches, '400', normalLunches * 400],
             ['2', 'COMIDAS', 'U', '', '400', '0'],
-            ['3', 'RESFUERZO MEDIO', 'U', improvedLunches, '500', improvedLunches * 500],
+            ['3', 'RESFUERZO MEDIO GENERAL', 'U', improvedLunches, '500', improvedLunches * 500],
             ['4', 'MERIENDAS LIGERAS', 'U', totalSnacks, '200', totalSnacks * 200],
             ['5', 'TRANSPORTACION', 'U', '', '6', '0'],
-            ['IMPORTE TOTAL', '', '', '', '', ''],
+            ['IMPORTE TOTAL GENERAL', '', '', '', '', ''],
             ['', '', '', '', '', ''],
             ['Pagase en CUP en Cuenta Bancaria', '', '', '', '', ''],
             ['1241570000832912', '', '', '', '', ''],
             ['', '', '', '', '', ''],
-            ['Por el Restaurante:', '', '', 'Por la ETECSA CTL Caibarién', '', ''],
+            ['Por Restaurantes:', '', '', 'Por la ETECSA CTL Caibarién', '', ''],
             ['Nombre y Apellidos:', '', '', 'Nombre y Apellidos:', '', ''],
             ['Cargo:', '', '', 'Cargo:', '', ''],
             ['Firma:', '', '', 'Firma:', '', ''],
@@ -648,12 +723,11 @@ function exportFacturaExcel() {
         
         // Calcular el importe total
         const total = (normalLunches * 400) + (improvedLunches * 500) + (totalSnacks * 200);
-        facturaData[10][5] = total; // Fila 11, columna 6 (0-index: 10,5)
+        facturaData[10][5] = total;
         
         const ws = XLSX.utils.aoa_to_sheet(facturaData);
         
         // Aplicar estilos para que se parezca al original
-        // Configurar anchos de columna
         const wscols = [
             {wch: 5},   // No.
             {wch: 25},  // Descripción
@@ -664,34 +738,140 @@ function exportFacturaExcel() {
         ];
         ws['!cols'] = wscols;
         
-        // Aplicar formato de número a las celdas de importe
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        for(let R = range.s.r; R <= range.e.r; ++R) {
-            for(let C = range.s.c; C <= range.e.c; ++C) {
-                const cell_address = {c: C, r: R};
-                const cell_ref = XLSX.utils.encode_cell(cell_address);
-                
-                // Aplicar bordes a todas las celdas
-                if (!ws[cell_ref]) ws[cell_ref] = {};
-                ws[cell_ref].s = {
-                    border: {
-                        top: {style: 'thin', color: {rgb: "000000"}},
-                        bottom: {style: 'thin', color: {rgb: "000000"}},
-                        left: {style: 'thin', color: {rgb: "000000"}},
-                        right: {style: 'thin', color: {rgb: "000000"}}
-                    }
-                };
-                
-                // Negrita para encabezados y totales
-                if (R === 4 || R === 10 || R === 15 || R === 16 || R === 17 || R === 18 || R === 19) {
-                    ws[cell_ref].s.font = { bold: true };
-                }
-            }
-        }
+        XLSX.utils.book_append_sheet(wb, ws, "Factura General");
+        XLSX.writeFile(wb, `Factura_General_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showStatus('✅ Factura General exportada', 'success');
+    } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+    }
+}
+
+// Exportar Factura Kaniki (NUEVA FUNCIÓN)
+function exportFacturaKanikiExcel() {
+    try {
+        const wb = XLSX.utils.book_new();
         
-        XLSX.utils.book_append_sheet(wb, ws, "Factura");
-        XLSX.writeFile(wb, `Factura_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showStatus('✅ Factura exportada en formato Excel con datos calculados', 'success');
+        // Calcular totales para Kaniki
+        const kanikiDays = calculateTotalDaysByStore('kaniki');
+        const improvedKanikiDays = workers.reduce((total, worker) => {
+            if (worker.diet === 'mejorada') {
+                return total + (worker.kanikiDays || 0);
+            }
+            return total;
+        }, 0);
+        const normalKanikiDays = kanikiDays - improvedKanikiDays;
+        
+        // Calcular meriendas (asumiendo todas de Kaniki)
+        const totalSnacks = calculateTotalSnacks();
+        
+        // Crear hoja con formato de factura Kaniki
+        const facturaData = [
+            ['', '', '', '', 'Factura Kaniki No:', ''],
+            ['', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['No.', 'Descripción', 'U/M', 'Cantidad', 'Precio CUP', 'Importe'],
+            ['1', 'ALMUERZOS KANIKI', 'U', normalKanikiDays, '400', normalKanikiDays * 400],
+            ['2', 'COMIDAS', 'U', '', '400', '0'],
+            ['3', 'RESFUERZO MEDIO KANIKI', 'U', improvedKanikiDays, '500', improvedKanikiDays * 500],
+            ['4', 'MERIENDAS LIGERAS', 'U', totalSnacks, '200', totalSnacks * 200],
+            ['5', 'TRANSPORTACION', 'U', '', '6', '0'],
+            ['IMPORTE TOTAL KANIKI', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['Pagase en CUP en Cuenta Bancaria', '', '', '', '', ''],
+            ['1241570000832912', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['Por Kaniki:', '', '', 'Por la ETECSA CTL Caibarién', '', ''],
+            ['Nombre y Apellidos:', '', '', 'Nombre y Apellidos:', '', ''],
+            ['Cargo:', '', '', 'Cargo:', '', ''],
+            ['Firma:', '', '', 'Firma:', '', ''],
+            ['FECHA', '', '', 'FECHA', '', '']
+        ];
+        
+        // Calcular el importe total
+        const total = (normalKanikiDays * 400) + (improvedKanikiDays * 500) + (totalSnacks * 200);
+        facturaData[10][5] = total;
+        
+        const ws = XLSX.utils.aoa_to_sheet(facturaData);
+        
+        // Aplicar estilos
+        const wscols = [
+            {wch: 5},   // No.
+            {wch: 25},  // Descripción
+            {wch: 5},   // U/M
+            {wch: 10},  // Cantidad
+            {wch: 10},  // Precio CUP
+            {wch: 12}   // Importe
+        ];
+        ws['!cols'] = wscols;
+        
+        XLSX.utils.book_append_sheet(wb, ws, "Factura Kaniki");
+        XLSX.writeFile(wb, `Factura_Kaniki_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showStatus('✅ Factura Kaniki exportada', 'success');
+    } catch (error) {
+        showStatus('❌ Error: ' + error.message, 'error');
+    }
+}
+
+// Exportar Factura Punta Brava (NUEVA FUNCIÓN)
+function exportFacturaPuntaBravaExcel() {
+    try {
+        const wb = XLSX.utils.book_new();
+        
+        // Calcular totales para Punta Brava
+        const puntabravaDays = calculateTotalDaysByStore('punta_brava');
+        const improvedPuntaBravaDays = workers.reduce((total, worker) => {
+            if (worker.diet === 'mejorada') {
+                return total + (worker.puntabravaDays || 0);
+            }
+            return total;
+        }, 0);
+        const normalPuntaBravaDays = puntabravaDays - improvedPuntaBravaDays;
+        
+        // Crear hoja con formato de factura Punta Brava
+        const facturaData = [
+            ['', '', '', '', 'Factura Punta Brava No:', ''],
+            ['', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['No.', 'Descripción', 'U/M', 'Cantidad', 'Precio CUP', 'Importe'],
+            ['1', 'ALMUERZOS PUNTA BRAVA', 'U', normalPuntaBravaDays, '400', normalPuntaBravaDays * 400],
+            ['2', 'COMIDAS', 'U', '', '400', '0'],
+            ['3', 'RESFUERZO MEDIO PUNTA BRAVA', 'U', improvedPuntaBravaDays, '500', improvedPuntaBravaDays * 500],
+            ['4', 'MERIENDAS LIGERAS', 'U', '', '200', '0'],
+            ['5', 'TRANSPORTACION', 'U', '', '6', '0'],
+            ['IMPORTE TOTAL PUNTA BRAVA', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['Pagase en CUP en Cuenta Bancaria', '', '', '', '', ''],
+            ['1241570000832912', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            ['Por Punta Brava:', '', '', 'Por la ETECSA CTL Caibarién', '', ''],
+            ['Nombre y Apellidos:', '', '', 'Nombre y Apellidos:', '', ''],
+            ['Cargo:', '', '', 'Cargo:', '', ''],
+            ['Firma:', '', '', 'Firma:', '', ''],
+            ['FECHA', '', '', 'FECHA', '', '']
+        ];
+        
+        // Calcular el importe total
+        const total = (normalPuntaBravaDays * 400) + (improvedPuntaBravaDays * 500);
+        facturaData[10][5] = total;
+        
+        const ws = XLSX.utils.aoa_to_sheet(facturaData);
+        
+        // Aplicar estilos
+        const wscols = [
+            {wch: 5},   // No.
+            {wch: 25},  // Descripción
+            {wch: 5},   // U/M
+            {wch: 10},  // Cantidad
+            {wch: 10},  // Precio CUP
+            {wch: 12}   // Importe
+        ];
+        ws['!cols'] = wscols;
+        
+        XLSX.utils.book_append_sheet(wb, ws, "Factura Punta Brava");
+        XLSX.writeFile(wb, `Factura_Punta_Brava_${new Date().toISOString().split('T')[0]}.xlsx`);
+        showStatus('✅ Factura Punta Brava exportada', 'success');
     } catch (error) {
         showStatus('❌ Error: ' + error.message, 'error');
     }
@@ -773,7 +953,7 @@ function exportProductosCanikiExcel() {
         const totalImporte = productos.reduce((sum, p) => sum + p.total, 0);
         
         // Agregar filas vacías si es necesario
-        const rowsNeeded = 40; // Total de filas en el formato
+        const rowsNeeded = 40;
         for (let i = productosData.length; i < rowsNeeded - 1; i++) {
             productosData.push(['', '', '', '', '']);
         }
@@ -792,42 +972,6 @@ function exportProductosCanikiExcel() {
             {wch: 15}   // Imp.
         ];
         ws['!cols'] = wscols;
-        
-        // Aplicar formato de número y bordes
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        for(let R = range.s.r; R <= range.e.r; ++R) {
-            for(let C = range.s.c; C <= range.e.c; ++C) {
-                const cell_address = {c: C, r: R};
-                const cell_ref = XLSX.utils.encode_cell(cell_address);
-                
-                if (!ws[cell_ref]) continue;
-                
-                // Aplicar bordes a todas las celdas
-                ws[cell_ref].s = {
-                    border: {
-                        top: {style: 'thin', color: {rgb: "000000"}},
-                        bottom: {style: 'thin', color: {rgb: "000000"}},
-                        left: {style: 'thin', color: {rgb: "000000"}},
-                        right: {style: 'thin', color: {rgb: "000000"}}
-                    }
-                };
-                
-                // Negrita para encabezados y totales
-                if (R === 3 || (R === productosData.length - 1 && C > 0)) {
-                    ws[cell_ref].s.font = { bold: true };
-                    if (R === productosData.length - 1) {
-                        ws[cell_ref].s.fill = {
-                            fgColor: {rgb: "FFFF00"} // Amarillo para total
-                        };
-                    }
-                }
-                
-                // Formato de número para las columnas de Precio, Cant. e Imp.
-                if (C === 2 || C === 3 || C === 4) {
-                    ws[cell_ref].s.numFmt = '#,##0.00';
-                }
-            }
-        }
         
         XLSX.utils.book_append_sheet(wb, ws, "Productos Caniki");
         XLSX.writeFile(wb, `Productos_Caniki_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -872,7 +1016,7 @@ function exportProductosPuntaBravaExcel() {
         const totalImporte = productos.reduce((sum, p) => sum + p.total, 0);
         
         // Agregar filas vacías si es necesario
-        const rowsNeeded = 40; // Total de filas en el formato
+        const rowsNeeded = 40;
         for (let i = productosData.length; i < rowsNeeded - 1; i++) {
             productosData.push(['', '', '', '', '']);
         }
@@ -891,42 +1035,6 @@ function exportProductosPuntaBravaExcel() {
             {wch: 15}   // Imp.
         ];
         ws['!cols'] = wscols;
-        
-        // Aplicar formato de número y bordes
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        for(let R = range.s.r; R <= range.e.r; ++R) {
-            for(let C = range.s.c; C <= range.e.c; ++C) {
-                const cell_address = {c: C, r: R};
-                const cell_ref = XLSX.utils.encode_cell(cell_address);
-                
-                if (!ws[cell_ref]) continue;
-                
-                // Aplicar bordes a todas las celdas
-                ws[cell_ref].s = {
-                    border: {
-                        top: {style: 'thin', color: {rgb: "000000"}},
-                        bottom: {style: 'thin', color: {rgb: "000000"}},
-                        left: {style: 'thin', color: {rgb: "000000"}},
-                        right: {style: 'thin', color: {rgb: "000000"}}
-                    }
-                };
-                
-                // Negrita para encabezados y totales
-                if (R === 3 || (R === productosData.length - 1 && C > 0)) {
-                    ws[cell_ref].s.font = { bold: true };
-                    if (R === productosData.length - 1) {
-                        ws[cell_ref].s.fill = {
-                            fgColor: {rgb: "FFFF00"} // Amarillo para total
-                        };
-                    }
-                }
-                
-                // Formato de número para las columnas de Precio, Cant. e Imp.
-                if (C === 2 || C === 3 || C === 4) {
-                    ws[cell_ref].s.numFmt = '#,##0.00';
-                }
-            }
-        }
         
         XLSX.utils.book_append_sheet(wb, ws, "Productos Punta Brava");
         XLSX.writeFile(wb, `Productos_Punta_Brava_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -953,8 +1061,10 @@ function exportResumenPedidosEmpresa() {
             ['Hora:', new Date().toLocaleTimeString()],
             [''],
             ['TOTALES GENERALES'],
-            ['Total Almuerzos Normales:', calculateNormalLunches()],
-            ['Total Almuerzos Mejorados:', calculateImprovedLunches()],
+            ['Total Trabajadores:', workers.length],
+            ['Trabajadores con Estímulo:', workers.filter(w => w.diet === 'estimulo').length],
+            ['Total Días Kaniki:', calculateTotalDaysByStore('kaniki')],
+            ['Total Días Punta Brava:', calculateTotalDaysByStore('punta_brava')],
             ['Total Meriendas:', calculateTotalSnacks()],
             ['Presupuesto Total:', `$${calculateTotalBudget().toFixed(2)}`],
             ['Gasto Total en Alimentos:', `$${calculateTotalFoodExpense().toFixed(2)}`],
@@ -976,70 +1086,6 @@ function exportResumenPedidosEmpresa() {
                          totalCantKaniki + totalCantPuntaBrava, totalKaniki + totalPuntaBrava]);
         
         const ws1 = XLSX.utils.aoa_to_sheet(resumenData);
-        
-        // Aplicar estilos a la hoja 1
-        const ws1Range = XLSX.utils.decode_range(ws1['!ref']);
-        for(let R = ws1Range.s.r; R <= ws1Range.e.r; ++R) {
-            for(let C = ws1Range.s.c; C <= ws1Range.e.c; ++C) {
-                const cell_address = {c: C, r: R};
-                const cell_ref = XLSX.utils.encode_cell(cell_address);
-                
-                if (!ws1[cell_ref]) continue;
-                
-                // Bordes para todas las celdas
-                ws1[cell_ref].s = {
-                    border: {
-                        top: {style: 'thin', color: {rgb: "000000"}},
-                        bottom: {style: 'thin', color: {rgb: "000000"}},
-                        left: {style: 'thin', color: {rgb: "000000"}},
-                        right: {style: 'thin', color: {rgb: "000000"}}
-                    }
-                };
-                
-                // Títulos en negrita
-                if (R === 0 || R === 1 || R === 5 || R === 13) {
-                    ws1[cell_ref].s.font = { bold: true, size: 14 };
-                    ws1[cell_ref].s.alignment = { horizontal: 'center' };
-                }
-                
-                // Encabezados de tabla
-                if (R === 14) {
-                    ws1[cell_ref].s.font = { bold: true };
-                    ws1[cell_ref].s.fill = {
-                        fgColor: {rgb: "366092"} // Azul oscuro
-                    };
-                    ws1[cell_ref].s.color = {rgb: "FFFFFF"};
-                }
-                
-                // Filas de totales
-                if (R >= resumenData.length - 3) {
-                    ws1[cell_ref].s.font = { bold: true };
-                    if (R === resumenData.length - 1) {
-                        ws1[cell_ref].s.fill = {
-                            fgColor: {rgb: "C5D9F1"} // Azul claro
-                        };
-                    }
-                }
-                
-                // Formato de moneda para columnas de importe
-                if (C === 3 && R >= 15 && R <= resumenData.length - 1) {
-                    ws1[cell_ref].s.numFmt = '"$"#,##0.00';
-                }
-                
-                // Formato de número para cantidades
-                if (C === 2 && R >= 15 && R <= resumenData.length - 1) {
-                    ws1[cell_ref].s.numFmt = '#,##0';
-                }
-            }
-        }
-        
-        // Ajustar ancho de columnas
-        ws1['!cols'] = [
-            {wch: 25}, // Tienda
-            {wch: 12}, // Productos
-            {wch: 15}, // Cantidad
-            {wch: 18}  // Importe
-        ];
         
         XLSX.utils.book_append_sheet(wb, ws1, "Resumen General");
         
@@ -1080,7 +1126,7 @@ function exportResumenPedidosEmpresa() {
             ['DETALLE DE PEDIDOS POR TRABAJADOR'],
             ['Fecha:', new Date().toLocaleDateString()],
             [''],
-            ['Trabajador', 'Tienda', 'Producto', 'Cantidad', 'Precio Unitario', 'Subtotal']
+            ['Trabajador', 'Tipo Dieta', 'Tienda', 'Producto', 'Cantidad', 'Precio Unitario', 'Subtotal']
         ];
         
         workers.forEach(worker => {
@@ -1089,6 +1135,7 @@ function exportResumenPedidosEmpresa() {
                 if (foodInfo) {
                     detalleData.push([
                         `${worker.name} ${worker.surname}`,
+                        getDietDisplayName(worker.diet),
                         getStoreDisplayName(foodInfo.store),
                         food.name,
                         food.quantity,
@@ -1129,15 +1176,36 @@ function showStatus(message, type) {
 
 // ==================== FUNCIONES DE RENDERIZADO ====================
 
-// Renderizar lista de trabajadores
+// Renderizar lista de trabajadores (MODIFICADA)
 function renderWorkers() {
     const workersList = document.getElementById('workers-list');
     workersList.innerHTML = '';
     
     workers.forEach(worker => {
-        const dailyBudget = dietPrices[worker.diet] || 0;
-        const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-        const totalBudget = (dailyBudget * worker.days) + snackBudget;
+        let totalBudget = 0;
+        let budgetDisplay = '';
+        
+        if (worker.diet === 'estimulo') {
+            totalBudget = worker.stimulusBalance || 0;
+            budgetDisplay = `$${totalBudget.toFixed(2)}`;
+        } else {
+            const dailyBudget = dietPrices[worker.diet] || 0;
+            const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
+            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+            totalBudget = (dailyBudget * totalDays) + snackBudget;
+            
+            // Mostrar desglose de días por empresa
+            let daysInfo = '';
+            if (worker.kanikiDays > 0 && worker.puntabravaDays > 0) {
+                daysInfo = `<small>(K:${worker.kanikiDays} | P:${worker.puntabravaDays})</small>`;
+            } else if (worker.kanikiDays > 0) {
+                daysInfo = `<small>(Kaniki: ${worker.kanikiDays})</small>`;
+            } else if (worker.puntabravaDays > 0) {
+                daysInfo = `<small>(Punta Brava: ${worker.puntabravaDays})</small>`;
+            }
+            budgetDisplay = `$${totalBudget.toFixed(2)}<br>${daysInfo}`;
+        }
+        
         const foodExpense = calculateWorkerFoodExpense(worker);
         const remaining = totalBudget - foodExpense;
         const percentUsed = totalBudget > 0 ? ((foodExpense / totalBudget) * 100) : 0;
@@ -1147,11 +1215,11 @@ function renderWorkers() {
             <td><strong>${worker.name}</strong></td>
             <td>${worker.surname}</td>
             <td><span class="diet-badge ${worker.diet}">${getDietDisplayName(worker.diet)}</span></td>
-            <td>${worker.days}</td>
-            <td>${worker.snacks || 0}</td>
-            <td>$${dailyBudget.toFixed(2)}</td>
+            <td>${worker.diet === 'estimulo' ? '-' : `${(worker.kanikiDays || 0) + (worker.puntabravaDays || 0)}`}</td>
+            <td>${worker.diet === 'estimulo' ? '-' : (worker.snacks || 0)}</td>
+            <td>${worker.diet === 'estimulo' ? 'Estímulo' : `$${dietPrices[worker.diet] || 0}`}</td>
             <td>
-                <strong>$${totalBudget.toFixed(2)}</strong>
+                <strong>${budgetDisplay}</strong>
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: ${Math.min(percentUsed, 100)}%"></div>
                 </div>
@@ -1276,7 +1344,7 @@ function updateFoodSelect() {
     }
 }
 
-// Mostrar detalles del trabajador CON BOTÓN DE RESET
+// Mostrar detalles del trabajador CON BOTÓN DE RESET (MODIFICADA)
 function showWorkerDetails(workerId) {
     const worker = workers.find(w => w.id === workerId);
     if (!worker) return;
@@ -1289,9 +1357,17 @@ function showWorkerDetails(workerId) {
     
     // Actualizar información del trabajador
     const workerInfo = document.getElementById('worker-info');
-    const dailyBudget = dietPrices[worker.diet] || 0;
-    const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-    const totalBudget = (dailyBudget * worker.days) + snackBudget;
+    
+    let totalBudget = 0;
+    if (worker.diet === 'estimulo') {
+        totalBudget = worker.stimulusBalance || 0;
+    } else {
+        const dailyBudget = dietPrices[worker.diet] || 0;
+        const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
+        const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+        totalBudget = (dailyBudget * totalDays) + snackBudget;
+    }
+    
     const foodExpense = calculateWorkerFoodExpense(worker);
     const remaining = totalBudget - foodExpense;
     const percentUsed = totalBudget > 0 ? ((foodExpense / totalBudget) * 100) : 0;
@@ -1303,20 +1379,24 @@ function showWorkerDetails(workerId) {
         </div>
         <div class="worker-stats">
             <div class="stat-item">
-                <div class="stat-label">📅 Días Trabajados</div>
-                <div class="stat-value">${worker.days}</div>
+                <div class="stat-label">📅 Días Kaniki</div>
+                <div class="stat-value">${worker.diet === 'estimulo' ? '-' : (worker.kanikiDays || 0)}</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">📅 Días Punta Brava</div>
+                <div class="stat-value">${worker.diet === 'estimulo' ? '-' : (worker.puntabravaDays || 0)}</div>
             </div>
             <div class="stat-item">
                 <div class="stat-label">🍎 Meriendas</div>
-                <div class="stat-value">${worker.snacks || 0}</div>
+                <div class="stat-value">${worker.diet === 'estimulo' ? '-' : (worker.snacks || 0)}</div>
             </div>
             <div class="stat-item">
-                <div class="stat-label">💰 Precio por Merienda</div>
-                <div class="stat-value">$${(worker.snackPrice || 50).toFixed(2)}</div>
+                <div class="stat-label">💰 ${worker.diet === 'estimulo' ? 'Estímulo' : 'Precio por Merienda'}</div>
+                <div class="stat-value">${worker.diet === 'estimulo' ? `$${(worker.stimulusBalance || 0).toFixed(2)}` : `$${(worker.snackPrice || 50).toFixed(2)}`}</div>
             </div>
             <div class="stat-item">
-                <div class="stat-label">💵 Presupuesto Diario</div>
-                <div class="stat-value">$${dailyBudget.toFixed(2)}</div>
+                <div class="stat-label">💵 ${worker.diet === 'estimulo' ? 'Saldo Estímulo' : 'Presupuesto Diario'}</div>
+                <div class="stat-value">${worker.diet === 'estimulo' ? '-' : `$${dietPrices[worker.diet] || 0}`}</div>
             </div>
             <div class="stat-item">
                 <div class="stat-label">🏦 Presupuesto Total</div>
@@ -1408,11 +1488,17 @@ function renderWorkerFoods(worker) {
     });
 }
 
-// Actualizar resumen del trabajador
+// Actualizar resumen del trabajador (MODIFICADA)
 function updateWorkerSummary(worker) {
-    const dailyBudget = dietPrices[worker.diet] || 0;
-    const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-    const totalBudget = (dailyBudget * worker.days) + snackBudget;
+    let totalBudget = 0;
+    if (worker.diet === 'estimulo') {
+        totalBudget = worker.stimulusBalance || 0;
+    } else {
+        const dailyBudget = dietPrices[worker.diet] || 0;
+        const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
+        const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+        totalBudget = (dailyBudget * totalDays) + snackBudget;
+    }
     
     let foodExpense = 0;
     worker.foods.forEach(food => {
@@ -1433,10 +1519,11 @@ function updateWorkerSummary(worker) {
     }
 }
 
-// Actualizar resumen general
+// Actualizar resumen general (MODIFICADA)
 function updateSummary() {
     // Actualizar estadísticas generales
     const totalWorkers = workers.length;
+    const totalStimulusWorkers = workers.filter(w => w.diet === 'estimulo').length;
     const totalBudget = calculateTotalBudget();
     const totalFoodExpense = calculateTotalFoodExpense();
     const totalRemaining = calculateTotalRemaining();
@@ -1451,9 +1538,15 @@ function updateSummary() {
     summaryList.innerHTML = '';
     
     workers.forEach(worker => {
-        const dailyBudget = dietPrices[worker.diet] || 0;
-        const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
-        const workerBudget = (dailyBudget * worker.days) + snackBudget;
+        let workerBudget = 0;
+        if (worker.diet === 'estimulo') {
+            workerBudget = worker.stimulusBalance || 0;
+        } else {
+            const dailyBudget = dietPrices[worker.diet] || 0;
+            const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
+            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+            workerBudget = (dailyBudget * totalDays) + snackBudget;
+        }
         
         const workerFoodExpense = calculateWorkerFoodExpense(worker);
         const remaining = workerBudget - workerFoodExpense;
@@ -1473,7 +1566,7 @@ function updateSummary() {
                             <strong>${worker.name} ${worker.surname}</strong><br>
                             <span class="diet-badge ${worker.diet}">${getDietDisplayName(worker.diet)}</span>
                         </td>
-                        <td>${worker.days}</td>
+                        <td>${worker.diet === 'estimulo' ? '-' : `${(worker.kanikiDays || 0) + (worker.puntabravaDays || 0)}`}</td>
                         <td>$${workerBudget.toFixed(2)}</td>
                         <td class="${remaining >= 0 ? 'positive' : 'negative'}">
                             $${remaining.toFixed(2)}
@@ -1486,7 +1579,7 @@ function updateSummary() {
                 } else {
                     // Filas siguientes del mismo trabajador - solo mostrar detalles del alimento
                     row.innerHTML = `
-                        <td>${worker.days}</td>
+                        <td>${worker.diet === 'estimulo' ? '-' : `${(worker.kanikiDays || 0) + (worker.puntabravaDays || 0)}`}</td>
                         <td>$${workerBudget.toFixed(2)}</td>
                         <td class="${remaining >= 0 ? 'positive' : 'negative'}">
                             $${remaining.toFixed(2)}
@@ -1508,7 +1601,7 @@ function updateSummary() {
                     <strong>${worker.name} ${worker.surname}</strong><br>
                     <span class="diet-badge ${worker.diet}">${getDietDisplayName(worker.diet)}</span>
                 </td>
-                <td>${worker.days}</td>
+                <td>${worker.diet === 'estimulo' ? '-' : `${(worker.kanikiDays || 0) + (worker.puntabravaDays || 0)}`}</td>
                 <td>$${workerBudget.toFixed(2)}</td>
                 <td class="positive">$${remaining.toFixed(2)}</td>
                 <td colspan="4" class="no-foods">Sin alimentos registrados</td>
@@ -1520,11 +1613,17 @@ function updateSummary() {
 
 // ==================== FUNCIONES DE MODALES ====================
 
-// Abrir modal para añadir/editar trabajador
+// Abrir modal para añadir/editar trabajador (MODIFICADA)
 function openWorkerModal(workerId = null) {
     const modal = document.getElementById('worker-modal');
     const title = document.getElementById('worker-modal-title');
     const form = document.getElementById('worker-form');
+    
+    // Obtener elementos del formulario
+    const dietSelect = document.getElementById('worker-diet');
+    const daysFields = document.getElementById('days-fields');
+    const stimulusField = document.getElementById('stimulus-field');
+    const meriendasField = document.getElementById('meriendas-fields');
     
     if (workerId) {
         // Modo edición
@@ -1536,9 +1635,22 @@ function openWorkerModal(workerId = null) {
             document.getElementById('worker-name').value = worker.name;
             document.getElementById('worker-surname').value = worker.surname;
             document.getElementById('worker-diet').value = worker.diet;
-            document.getElementById('worker-days').value = worker.days;
-            document.getElementById('worker-snacks').value = worker.snacks || 0;
-            document.getElementById('snack-price').value = worker.snackPrice || 50;
+            
+            // Mostrar campos según tipo de dieta
+            if (worker.diet === 'estimulo') {
+                daysFields.style.display = 'none';
+                meriendasField.style.display = 'none';
+                stimulusField.style.display = 'block';
+                document.getElementById('stimulus-balance').value = worker.stimulusBalance || 0;
+            } else {
+                daysFields.style.display = 'block';
+                meriendasField.style.display = 'block';
+                stimulusField.style.display = 'none';
+                document.getElementById('kaniki-days').value = worker.kanikiDays || 0;
+                document.getElementById('puntabrava-days').value = worker.puntabravaDays || 0;
+                document.getElementById('worker-snacks').value = worker.snacks || 0;
+                document.getElementById('snack-price').value = worker.snackPrice || 50;
+            }
         }
     } else {
         // Modo añadir
@@ -1547,50 +1659,102 @@ function openWorkerModal(workerId = null) {
         document.getElementById('worker-id').value = '';
         document.getElementById('worker-snacks').value = 0;
         document.getElementById('snack-price').value = 50;
+        document.getElementById('kaniki-days').value = 0;
+        document.getElementById('puntabrava-days').value = 0;
+        document.getElementById('stimulus-balance').value = 0;
+        
+        // Mostrar campos por defecto (normal)
+        daysFields.style.display = 'block';
+        meriendasField.style.display = 'block';
+        stimulusField.style.display = 'none';
     }
     
     modal.style.display = 'flex';
 }
 
-// Guardar trabajador (añadir o editar)
+// Guardar trabajador (añadir o editar) (MODIFICADA)
 function saveWorker() {
     const id = document.getElementById('worker-id').value;
     const name = document.getElementById('worker-name').value;
     const surname = document.getElementById('worker-surname').value;
     const diet = document.getElementById('worker-diet').value;
-    const days = parseInt(document.getElementById('worker-days').value);
-    const snacks = parseInt(document.getElementById('worker-snacks').value);
-    const snackPrice = parseFloat(document.getElementById('snack-price').value);
     
     if (!name || !surname) {
         showStatus('❌ Por favor, completa todos los campos obligatorios', 'error');
         return;
     }
     
-    if (id) {
-        // Editar trabajador existente
-        const workerIndex = workers.findIndex(w => w.id === parseInt(id));
-        if (workerIndex !== -1) {
-            workers[workerIndex].name = name;
-            workers[workerIndex].surname = surname;
-            workers[workerIndex].diet = diet;
-            workers[workerIndex].days = days;
-            workers[workerIndex].snacks = snacks;
-            workers[workerIndex].snackPrice = snackPrice;
+    if (diet === 'estimulo') {
+        // Manejo de estímulo
+        const stimulusBalance = parseFloat(document.getElementById('stimulus-balance').value) || 0;
+        
+        if (id) {
+            // Editar trabajador existente
+            const workerIndex = workers.findIndex(w => w.id === parseInt(id));
+            if (workerIndex !== -1) {
+                workers[workerIndex].name = name;
+                workers[workerIndex].surname = surname;
+                workers[workerIndex].diet = diet;
+                workers[workerIndex].stimulusBalance = stimulusBalance;
+                // Limpiar campos no utilizados
+                workers[workerIndex].kanikiDays = 0;
+                workers[workerIndex].puntabravaDays = 0;
+                workers[workerIndex].snacks = 0;
+                workers[workerIndex].snackPrice = 0;
+            }
+        } else {
+            // Añadir nuevo trabajador con estímulo
+            const newWorker = {
+                id: nextWorkerId++,
+                name: name,
+                surname: surname,
+                diet: diet,
+                stimulusBalance: stimulusBalance,
+                kanikiDays: 0,
+                puntabravaDays: 0,
+                snacks: 0,
+                snackPrice: 0,
+                foods: []
+            };
+            workers.push(newWorker);
         }
     } else {
-        // Añadir nuevo trabajador
-        const newWorker = {
-            id: nextWorkerId++,
-            name: name,
-            surname: surname,
-            diet: diet,
-            days: days,
-            snacks: snacks,
-            snackPrice: snackPrice,
-            foods: []
-        };
-        workers.push(newWorker);
+        // Manejo de dietas normales/mejoradas
+        const kanikiDays = parseInt(document.getElementById('kaniki-days').value) || 0;
+        const puntabravaDays = parseInt(document.getElementById('puntabrava-days').value) || 0;
+        const snacks = parseInt(document.getElementById('worker-snacks').value);
+        const snackPrice = parseFloat(document.getElementById('snack-price').value);
+        
+        if (id) {
+            // Editar trabajador existente
+            const workerIndex = workers.findIndex(w => w.id === parseInt(id));
+            if (workerIndex !== -1) {
+                workers[workerIndex].name = name;
+                workers[workerIndex].surname = surname;
+                workers[workerIndex].diet = diet;
+                workers[workerIndex].kanikiDays = kanikiDays;
+                workers[workerIndex].puntabravaDays = puntabravaDays;
+                workers[workerIndex].snacks = snacks;
+                workers[workerIndex].snackPrice = snackPrice;
+                // Limpiar campo de estímulo
+                workers[workerIndex].stimulusBalance = 0;
+            }
+        } else {
+            // Añadir nuevo trabajador
+            const newWorker = {
+                id: nextWorkerId++,
+                name: name,
+                surname: surname,
+                diet: diet,
+                kanikiDays: kanikiDays,
+                puntabravaDays: puntabravaDays,
+                snacks: snacks,
+                snackPrice: snackPrice,
+                stimulusBalance: 0,
+                foods: []
+            };
+            workers.push(newWorker);
+        }
     }
     
     // Cerrar modal y actualizar interfaz
@@ -1817,11 +1981,12 @@ function resetWorkerFoods(worker) {
 
 // ==================== FUNCIONES AUXILIARES ====================
 
-// Función auxiliar para mostrar nombre de dieta
+// Función auxiliar para mostrar nombre de dieta (MODIFICADA)
 function getDietDisplayName(diet) {
     const dietNames = {
         normal: 'Normal',
-        mejorada: 'Mejorada'
+        mejorada: 'Mejorada',
+        estimulo: 'Estímulo'
     };
     return dietNames[diet] || diet;
 }
@@ -1960,11 +2125,51 @@ function exportBackup() {
     }
 }
 
+// ==================== NUEVAS FUNCIONES PARA ESTÍMULO ====================
+
+// Función para aplicar estímulo a TODOS los trabajadores
+// Función para aplicar estímulo a TODOS los trabajadores
+function applyStimulusToAll() {
+    const stimulusAmount = parseFloat(prompt('Ingrese el monto del estímulo para TODOS los trabajadores:', '0'));
+    
+    if (isNaN(stimulusAmount) || stimulusAmount <= 0) {
+        showStatus('❌ Monto inválido', 'error');
+        return;
+    }
+    
+    if (confirm(`¿Está seguro de cambiar a TODOS los trabajadores a dieta "Estímulo" con un saldo de $${stimulusAmount.toFixed(2)}?\n\nEsta acción afectará a ${workers.length} trabajadores y no se puede deshacer.`)) {
+        workers.forEach(worker => {
+            // Cambiar la dieta a "estimulo" para todos
+            worker.diet = 'estimulo';
+            worker.stimulusBalance = stimulusAmount; // CORRECCIÓN: usar stimulusAmount, no stimulusBalance
+            // Limpiar campos de días y meriendas
+            worker.kanikiDays = 0;
+            worker.puntabravaDays = 0;
+            worker.snacks = 0;
+            worker.snackPrice = 0;
+        });
+        
+        renderWorkers();
+        updateSummary();
+        saveDataToLocalStorage();
+        
+        // Si estamos viendo los detalles de un trabajador, actualizarlos
+        if (currentWorkerId) {
+            const worker = workers.find(w => w.id === currentWorkerId);
+            if (worker) {
+                showWorkerDetails(currentWorkerId);
+            }
+        }
+        
+        showStatus(`✅ Todos los trabajadores cambiados a estímulo con $${stimulusAmount.toFixed(2)}`, 'success');
+    }
+}
+
 // ==================== CONFIGURACIÓN DE EVENTOS ====================
 
-// Configurar event listeners
+// Configurar event listeners (MODIFICADA)
 function setupEventListeners() {
-    // Tabs
+       // Tabs
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', function() {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1978,6 +2183,11 @@ function setupEventListeners() {
     // Botón añadir trabajador
     document.getElementById('add-worker-btn').addEventListener('click', function() {
         openWorkerModal();
+    });
+    
+    // Botón aplicar estímulo a todos - Asegurar que esté conectado
+    document.getElementById('apply-stimulus-btn').addEventListener('click', function() {
+        applyStimulusToAll();
     });
     
     // Botón añadir alimento al catálogo
@@ -2031,16 +2241,17 @@ function setupEventListeners() {
         exportFullReportToExcel();
     });
     
-    document.getElementById('export-factura-excel-btn').addEventListener('click', function() {
-        exportFacturaExcel();
+    // Botones de exportación de facturas por empresa
+    document.getElementById('export-factura-general-btn').addEventListener('click', function() {
+        exportFacturaGeneralExcel();
     });
     
-    document.getElementById('export-caniki-excel-btn').addEventListener('click', function() {
-        exportProductosCanikiExcel();
+    document.getElementById('export-factura-kaniki-btn').addEventListener('click', function() {
+        exportFacturaKanikiExcel();
     });
     
-    document.getElementById('export-puntabrava-excel-btn').addEventListener('click', function() {
-        exportProductosPuntaBravaExcel();
+    document.getElementById('export-factura-puntabrava-btn').addEventListener('click', function() {
+        exportFacturaPuntaBravaExcel();
     });
     
     // Botón para exportar resumen de pedidos (versión 2 - desde pestaña Excel)
@@ -2075,6 +2286,24 @@ function setupEventListeners() {
     window.addEventListener('click', function(e) {
         if (e.target.classList.contains('modal')) {
             e.target.style.display = 'none';
+        }
+    });
+    
+    // Manejar cambio de dieta en el formulario
+    document.getElementById('worker-diet').addEventListener('change', function() {
+        const diet = this.value;
+        const daysFields = document.getElementById('days-fields');
+        const stimulusField = document.getElementById('stimulus-field');
+        const meriendasField = document.getElementById('meriendas-fields');
+        
+        if (diet === 'estimulo') {
+            daysFields.style.display = 'none';
+            meriendasField.style.display = 'none';
+            stimulusField.style.display = 'block';
+        } else {
+            daysFields.style.display = 'block';
+            meriendasField.style.display = 'block';
+            stimulusField.style.display = 'none';
         }
     });
 }

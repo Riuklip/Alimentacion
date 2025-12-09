@@ -11,6 +11,7 @@
     --kaniki-color: #3498db;
     --puntabrava-color: #2ecc71;
     --reset-color: #9b59b6;
+    --stimulus-color: #9b59b6;
 }
 
 * {
@@ -547,6 +548,11 @@ button:hover {
     color: white;
 }
 
+.diet-badge.estimulo {
+    background-color: var(--stimulus-color);
+    color: white;
+}
+
 .positive {
     color: #27ae60;
     font-weight: bold;
@@ -711,6 +717,29 @@ button:hover {
     animation: none;
 }
 
+/* Estilos para días por empresa */
+.days-display {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+    font-size: 12px;
+}
+
+.day-item {
+    background-color: #f8f9fa;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.day-item.kaniki {
+    border-left: 3px solid #3498db;
+}
+
+.day-item.puntabrava {
+    border-left: 3px solid #2ecc71;
+}
+
 @media (max-width: 768px) {
     .container {
         margin: 10px;
@@ -764,6 +793,11 @@ button:hover {
         width: 95%;
         padding: 20px;
     }
+    
+    .days-display {
+        flex-direction: column;
+        gap: 2px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -786,5 +820,53 @@ button:hover {
     
     th, td {
         padding: 10px 12px;
+    }
+}
+/* Añadir al final del archivo style.css */
+
+/* Estilos para badges de dieta */
+.diet-badge.normal {
+    background-color: #3498db;
+    color: white;
+}
+
+.diet-badge.mejorada {
+    background-color: #2ecc71;
+    color: white;
+}
+
+.diet-badge.estimulo {
+    background-color: #9b59b6;
+    color: white;
+}
+
+/* Estilos para días por empresa */
+.days-display {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+    font-size: 12px;
+}
+
+.day-item {
+    background-color: #f8f9fa;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.day-item.kaniki {
+    border-left: 3px solid #3498db;
+}
+
+.day-item.puntabrava {
+    border-left: 3px solid #2ecc71;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .days-display {
+        flex-direction: column;
+        gap: 2px;
     }
 }

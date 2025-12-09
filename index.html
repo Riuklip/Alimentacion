@@ -25,7 +25,7 @@
         
         <div class="format-info">
             <strong>📊 Formato Excel requerido:</strong>
-            <p><strong>📄 Trabajadores.xlsx:</strong> Columnas: Nombre, Apellidos, TipoDieta, DiasTrabajados, Meriendas, PrecioMerienda</p>
+            <p><strong>📄 Trabajadores.xlsx:</strong> Columnas: Nombre, Apellidos, TipoDieta, DiasKaniki, DiasPuntaBrava, Meriendas, PrecioMerienda, Estímulo</p>
             <p><strong>🍎 Alimentos.xlsx:</strong> Columnas: Nombre, Precio, Tienda</p>
             <p><em>💡 Consejo: Descarga las plantillas de Excel para empezar</em></p>
         </div>
@@ -36,6 +36,7 @@
             <button id="import-foods-excel-btn" class="btn-excel">📁 Importar Alimentos (Excel)</button>
             <button id="export-excel-btn" class="btn-excel">💾 Exportar Todo a Excel</button>
             <button id="export-resumen-pedidos-btn" class="btn-excel">🏢 Resumen Pedidos Empresa</button>
+            <button id="apply-stimulus-btn" class="btn-info">💰 Aplicar Estímulo a Todos</button>
             <button id="backup-btn" class="btn-info">💾 Exportar Backup</button>
         </div>
         
@@ -66,9 +67,9 @@
                                 <th>Nombre</th>
                                 <th>Apellidos</th>
                                 <th>Tipo de Alimentación</th>
-                                <th>Días Trabajados</th>
+                                <th>Días Totales</th>
                                 <th>Meriendas</th>
-                                <th>Presupuesto Diario</th>
+                                <th>Presupuesto Diario/Estímulo</th>
                                 <th>Presupuesto Total</th>
                                 <th>Acciones</th>
                             </tr>
@@ -249,8 +250,21 @@
                             <button class="btn-excel" id="export-full-excel-btn">
                                 📊 Exportar Reporte Completo
                             </button>
-                            <button class="btn-excel" id="export-factura-excel-btn">
-                                🧾 Exportar Factura
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h3>🧾 Facturas por Empresa</h3>
+                        <p>Exporta facturas específicas para cada empresa</p>
+                        <div class="feature-buttons">
+                            <button class="btn-excel" id="export-factura-general-btn">
+                                🧾 Factura General
+                            </button>
+                            <button class="btn-excel" id="export-factura-kaniki-btn">
+                                🛒 Factura Kaniki
+                            </button>
+                            <button class="btn-excel" id="export-factura-puntabrava-btn">
+                                🛒 Factura Punta Brava
                             </button>
                         </div>
                     </div>
@@ -292,7 +306,7 @@
         </div>
     </div>
     
-    <!-- Modal para añadir/editar trabajador -->
+    <!-- Modal para añadir/editar trabajador MODIFICADO -->
     <div id="worker-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -316,13 +330,24 @@
                     <select id="worker-diet" required>
                         <option value="normal">Normal (400$/día)</option>
                         <option value="mejorada">Mejorada (500$/día)</option>
+                        <option value="estimulo">Estímulo (Saldo fijo)</option>
                     </select>
                 </div>
-                <div class="form-row">
+                
+                <!-- Campos para días por empresa (solo para normal/mejorada) -->
+                <div class="form-row" id="days-fields">
                     <div class="form-group">
-                        <label for="worker-days">Días Trabajados:</label>
-                        <input type="number" id="worker-days" min="0" value="0" required>
+                        <label for="kaniki-days">Días en Kaniki:</label>
+                        <input type="number" id="kaniki-days" min="0" value="0" required>
                     </div>
+                    <div class="form-group">
+                        <label for="puntabrava-days">Días en Punta Brava:</label>
+                        <input type="number" id="puntabrava-days" min="0" value="0" required>
+                    </div>
+                </div>
+                
+                <!-- Campos para meriendas (solo para normal/mejorada) -->
+                <div class="form-row" id="meriendas-fields">
                     <div class="form-group">
                         <label for="worker-snacks">Número de Meriendas:</label>
                         <input type="number" id="worker-snacks" min="0" value="0" required>
@@ -332,6 +357,15 @@
                         <input type="number" id="snack-price" min="0" step="0.01" value="50" required>
                     </div>
                 </div>
+                
+                <!-- Campo para estímulo (solo para tipo estímulo) -->
+                <div class="form-row" id="stimulus-field" style="display: none;">
+                    <div class="form-group">
+                        <label for="stimulus-balance">Saldo del Estímulo ($):</label>
+                        <input type="number" id="stimulus-balance" min="0" step="0.01" value="0" required>
+                    </div>
+                </div>
+                
                 <button type="submit" class="btn-success">💾 Guardar Trabajador</button>
             </form>
         </div>
