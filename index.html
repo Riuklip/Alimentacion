@@ -14,22 +14,6 @@
             <p>Control de dietas y compras para trabajadores - Compatibilidad Excel Completa</p>
         </header>
         
-        <div class="instructions">
-            <h3>📋 Instrucciones de uso:</h3>
-            <p>✅ <strong>Importar desde Excel:</strong> Carga tus archivos Excel (.xlsx) directamente</p>
-            <p>✅ <strong>Trabajar:</strong> Realiza todos los cambios necesarios en la aplicación</p>
-            <p>✅ <strong>Exportar a Excel:</strong> Descarga los archivos Excel actualizados</p>
-            <p>✅ <strong>Compatible 100%:</strong> Abre y edita los archivos en Microsoft Excel</p>
-            <p>📌 <strong>Nota:</strong> Los datos se guardan automáticamente en tu navegador</p>
-        </div>
-        
-        <div class="format-info">
-            <strong>📊 Formato Excel requerido:</strong>
-            <p><strong>📄 Trabajadores.xlsx:</strong> Columnas: Nombre, Apellidos, TipoDieta, DiasKaniki, DiasPuntaBrava, Meriendas, PrecioMerienda, Estímulo</p>
-            <p><strong>🍎 Alimentos.xlsx:</strong> Columnas: Nombre, Precio, Tienda</p>
-            <p><em>💡 Consejo: Descarga las plantillas de Excel para empezar</em></p>
-        </div>
-        
         <div class="file-controls">
             <button id="download-template-btn" class="btn-excel">📥 Descargar Plantillas Excel</button>
             <button id="import-workers-excel-btn" class="btn-excel">📁 Importar Trabajadores (Excel)</button>
@@ -68,7 +52,7 @@
                                 <th>Apellidos</th>
                                 <th>Tipo de Alimentación</th>
                                 <th>Días Totales</th>
-                                <th>Meriendas</th>
+                                <th>Meriendas Totales</th>
                                 <th>Presupuesto Diario/Estímulo</th>
                                 <th>Presupuesto Total</th>
                                 <th>Acciones</th>
@@ -306,7 +290,7 @@
         </div>
     </div>
     
-    <!-- Modal para añadir/editar trabajador MODIFICADO -->
+    <!-- Modal para añadir/editar trabajador MODIFICADO con meriendas por empresa -->
     <div id="worker-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -346,11 +330,15 @@
                     </div>
                 </div>
                 
-                <!-- Campos para meriendas (solo para normal/mejorada) -->
+                <!-- Campos para meriendas por empresa (solo para normal/mejorada) -->
                 <div class="form-row" id="meriendas-fields">
                     <div class="form-group">
-                        <label for="worker-snacks">Número de Meriendas:</label>
-                        <input type="number" id="worker-snacks" min="0" value="0" required>
+                        <label for="worker-snacks-kaniki">Meriendas en Kaniki:</label>
+                        <input type="number" id="worker-snacks-kaniki" min="0" value="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="worker-snacks-puntabrava">Meriendas en Punta Brava:</label>
+                        <input type="number" id="worker-snacks-puntabrava" min="0" value="0" required>
                     </div>
                     <div class="form-group">
                         <label for="snack-price">Precio por Merienda ($):</label>

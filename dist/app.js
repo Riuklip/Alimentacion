@@ -113,7 +113,8 @@ function initializeWithSampleData() {
             diet: "normal", 
             kanikiDays: 15,
             puntabravaDays: 5,
-            snacks: 10, 
+            snacksKaniki: 6,  // Meriendas en Kaniki
+            snacksPuntaBrava: 4, // Meriendas en Punta Brava
             snackPrice: 50,
             stimulusBalance: 0,
             foods: [
@@ -128,7 +129,8 @@ function initializeWithSampleData() {
             diet: "mejorada", 
             kanikiDays: 10,
             puntabravaDays: 8,
-            snacks: 8, 
+            snacksKaniki: 5,  // Meriendas en Kaniki
+            snacksPuntaBrava: 3, // Meriendas en Punta Brava
             snackPrice: 50,
             stimulusBalance: 0,
             foods: [
@@ -143,7 +145,8 @@ function initializeWithSampleData() {
             diet: "estimulo", 
             kanikiDays: 0,
             puntabravaDays: 0,
-            snacks: 0, 
+            snacksKaniki: 0,
+            snacksPuntaBrava: 0,
             snackPrice: 0,
             stimulusBalance: 1000,
             foods: []
@@ -230,10 +233,10 @@ function downloadExcelTemplates() {
     try {
         // Plantilla de trabajadores
         const workersTemplate = [
-            ['Nombre', 'Apellidos', 'TipoDieta', 'DiasKaniki', 'DiasPuntaBrava', 'Meriendas', 'PrecioMerienda', 'Estímulo'],
-            ['Juan', 'García Pérez', 'normal', '15', '5', '10', '50', ''],
-            ['María', 'López Rodríguez', 'mejorada', '10', '8', '8', '50', ''],
-            ['Carlos', 'Martínez', 'estimulo', '', '', '', '', '1000']
+            ['Nombre', 'Apellidos', 'TipoDieta', 'DiasKaniki', 'DiasPuntaBrava', 'MeriendasKaniki', 'MeriendasPuntaBrava', 'PrecioMerienda', 'Estímulo'],
+            ['Juan', 'García Pérez', 'normal', '15', '5', '6', '4', '50', ''],
+            ['María', 'López Rodríguez', 'mejorada', '10', '8', '5', '3', '50', ''],
+            ['Carlos', 'Martínez', 'estimulo', '', '', '', '', '', '1000']
         ];
         
         // Plantilla de alimentos
@@ -335,11 +338,14 @@ function importWorkersFromExcel(workbook) {
             h && h.toString().toLowerCase().includes('puntabrava') ||
             h && h.toString().toLowerCase().includes('punta brava')
         );
-        const snacksIndex = headers.findIndex(h => 
-            h && h.toString().toLowerCase().includes('merienda')
+        const snacksKanikiIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('meriendakaniki')
+        );
+        const snacksPuntaBravaIndex = headers.findIndex(h => 
+            h && h.toString().toLowerCase().includes('meriendapuntabrava')
         );
         const snackPriceIndex = headers.findIndex(h => 
-            h && h.toString().toLowerCase().includes('precio')
+            h && h.toString().toLowerCase().includes('preciomerienda')
         );
         const stimulusIndex = headers.findIndex(h => 
             h && h.toString().toLowerCase().includes('estímulo') ||
@@ -361,7 +367,8 @@ function importWorkersFromExcel(workbook) {
                 diet: (row[dietIndex] || 'normal').toString().toLowerCase(),
                 kanikiDays: parseInt(row[kanikiDaysIndex]) || 0,
                 puntabravaDays: parseInt(row[puntabravaDaysIndex]) || 0,
-                snacks: parseInt(row[snacksIndex]) || 0,
+                snacksKaniki: parseInt(row[snacksKanikiIndex]) || 0,
+                snacksPuntaBrava: parseInt(row[snacksPuntaBravaIndex]) || 0,
                 snackPrice: parseFloat(row[snackPriceIndex]) || 50,
                 stimulusBalance: parseFloat(row[stimulusIndex]) || 0,
                 foods: []
@@ -372,7 +379,8 @@ function importWorkersFromExcel(workbook) {
                 worker.diet = 'estimulo';
                 worker.kanikiDays = 0;
                 worker.puntabravaDays = 0;
-                worker.snacks = 0;
+                worker.snacksKaniki = 0;
+                worker.snacksPuntaBrava = 0;
                 worker.snackPrice = 0;
             }
             
@@ -466,7 +474,7 @@ function exportAllToExcel() {
         
         // Hoja 1: Trabajadores
         const workersData = [
-            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días Kaniki', 'Días Punta Brava', 'Meriendas', 'Precio Merienda', 'Estímulo', 'Presupuesto Total', 'Gasto Alimentos', 'Saldo Restante']
+            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días Kaniki', 'Días Punta Brava', 'Meriendas Kaniki', 'Meriendas Punta Brava', 'Precio Merienda', 'Estímulo', 'Presupuesto Total', 'Gasto Alimentos', 'Saldo Restante']
         ];
         
         workers.forEach(worker => {
@@ -477,7 +485,8 @@ function exportAllToExcel() {
             } else {
                 const dailyBudget = dietPrices[worker.diet] || 0;
                 const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
-                const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+                const totalSnacks = (worker.snacksKaniki || 0) + (worker.snacksPuntaBrava || 0);
+                const snackBudget = totalSnacks * (worker.snackPrice || 50);
                 totalBudget = (dailyBudget * totalDays) + snackBudget;
             }
             
@@ -490,7 +499,8 @@ function exportAllToExcel() {
                 getDietDisplayName(worker.diet),
                 worker.diet === 'estimulo' ? '-' : (worker.kanikiDays || 0),
                 worker.diet === 'estimulo' ? '-' : (worker.puntabravaDays || 0),
-                worker.diet === 'estimulo' ? '-' : (worker.snacks || 0),
+                worker.diet === 'estimulo' ? '-' : (worker.snacksKaniki || 0),
+                worker.diet === 'estimulo' ? '-' : (worker.snacksPuntaBrava || 0),
                 worker.diet === 'estimulo' ? '-' : `$${(worker.snackPrice || 50).toFixed(2)}`,
                 worker.diet === 'estimulo' ? `$${(worker.stimulusBalance || 0).toFixed(2)}` : '-',
                 `$${totalBudget.toFixed(2)}`,
@@ -567,7 +577,7 @@ function exportFullReportToExcel() {
             ['Saldo Total Restante', `$${calculateTotalRemaining().toFixed(2)}`],
             [''],
             ['DETALLE POR TRABAJADOR'],
-            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días Kaniki', 'Días Punta Brava', 'Estímulo', 'Presupuesto', 'Gasto', 'Saldo', 'Alimentos Comprados']
+            ['Nombre', 'Apellidos', 'Tipo Dieta', 'Días Kaniki', 'Días Punta Brava', 'Meriendas Kaniki', 'Meriendas Punta Brava', 'Estímulo', 'Presupuesto', 'Gasto', 'Saldo', 'Alimentos Comprados']
         ];
         
         workers.forEach(worker => {
@@ -578,7 +588,8 @@ function exportFullReportToExcel() {
             } else {
                 const dailyBudget = dietPrices[worker.diet] || 0;
                 const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
-                const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+                const totalSnacks = (worker.snacksKaniki || 0) + (worker.snacksPuntaBrava || 0);
+                const snackBudget = totalSnacks * (worker.snackPrice || 50);
                 totalBudget = (dailyBudget * totalDays) + snackBudget;
             }
             
@@ -601,6 +612,8 @@ function exportFullReportToExcel() {
                 getDietDisplayName(worker.diet),
                 worker.diet === 'estimulo' ? '-' : (worker.kanikiDays || 0),
                 worker.diet === 'estimulo' ? '-' : (worker.puntabravaDays || 0),
+                worker.diet === 'estimulo' ? '-' : (worker.snacksKaniki || 0),
+                worker.diet === 'estimulo' ? '-' : (worker.snacksPuntaBrava || 0),
                 worker.diet === 'estimulo' ? `$${(worker.stimulusBalance || 0).toFixed(2)}` : '-',
                 `$${totalBudget.toFixed(2)}`,
                 `$${foodExpense.toFixed(2)}`,
@@ -635,11 +648,26 @@ function calculateImprovedLunches() {
         .reduce((total, worker) => total + (worker.kanikiDays || 0) + (worker.puntabravaDays || 0), 0);
 }
 
-// Calcular total de meriendas
+// Calcular total de meriendas (MODIFICADO)
 function calculateTotalSnacks() {
     return workers
         .filter(worker => worker.diet !== 'estimulo')
-        .reduce((total, worker) => total + (worker.snacks || 0), 0);
+        .reduce((total, worker) => 
+            total + (worker.snacksKaniki || 0) + (worker.snacksPuntaBrava || 0), 0);
+}
+
+// Calcular meriendas por empresa (NUEVA FUNCIÓN)
+function calculateSnacksByStore(store) {
+    return workers
+        .filter(worker => worker.diet !== 'estimulo')
+        .reduce((total, worker) => {
+            if (store === 'kaniki') {
+                return total + (worker.snacksKaniki || 0);
+            } else if (store === 'punta_brava') {
+                return total + (worker.snacksPuntaBrava || 0);
+            }
+            return total;
+        }, 0);
 }
 
 // Calcular gasto de un trabajador
@@ -655,7 +683,8 @@ function calculateTotalBudget() {
         } else {
             const dailyBudget = dietPrices[worker.diet] || 0;
             const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
-            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+            const totalSnacks = (worker.snacksKaniki || 0) + (worker.snacksPuntaBrava || 0);
+            const snackBudget = totalSnacks * (worker.snackPrice || 50);
             return total + (dailyBudget * totalDays) + snackBudget;
         }
     }, 0);
@@ -761,8 +790,8 @@ function exportFacturaKanikiExcel() {
         }, 0);
         const normalKanikiDays = kanikiDays - improvedKanikiDays;
         
-        // Calcular meriendas (asumiendo todas de Kaniki)
-        const totalSnacks = calculateTotalSnacks();
+        // Calcular meriendas para Kaniki
+        const kanikiSnacks = calculateSnacksByStore('kaniki');
         
         // Crear hoja con formato de factura Kaniki
         const facturaData = [
@@ -774,7 +803,7 @@ function exportFacturaKanikiExcel() {
             ['1', 'ALMUERZOS KANIKI', 'U', normalKanikiDays, '400', normalKanikiDays * 400],
             ['2', 'COMIDAS', 'U', '', '400', '0'],
             ['3', 'RESFUERZO MEDIO KANIKI', 'U', improvedKanikiDays, '500', improvedKanikiDays * 500],
-            ['4', 'MERIENDAS LIGERAS', 'U', totalSnacks, '200', totalSnacks * 200],
+            ['4', 'MERIENDAS LIGERAS', 'U', kanikiSnacks, '200', kanikiSnacks * 200],
             ['5', 'TRANSPORTACION', 'U', '', '6', '0'],
             ['IMPORTE TOTAL KANIKI', '', '', '', '', ''],
             ['', '', '', '', '', ''],
@@ -789,7 +818,7 @@ function exportFacturaKanikiExcel() {
         ];
         
         // Calcular el importe total
-        const total = (normalKanikiDays * 400) + (improvedKanikiDays * 500) + (totalSnacks * 200);
+        const total = (normalKanikiDays * 400) + (improvedKanikiDays * 500) + (kanikiSnacks * 200);
         facturaData[10][5] = total;
         
         const ws = XLSX.utils.aoa_to_sheet(facturaData);
@@ -828,18 +857,21 @@ function exportFacturaPuntaBravaExcel() {
         }, 0);
         const normalPuntaBravaDays = puntabravaDays - improvedPuntaBravaDays;
         
+        // Calcular meriendas para Punta Brava
+        const puntabravaSnacks = calculateSnacksByStore('punta_brava');
+        
         // Crear hoja con formato de factura Punta Brava
         const facturaData = [
-            ['', '', '', '', 'Factura Punta Brava No:', ''],
+            ['', '', '', '', 'Prefactura No:', ''],
             ['', '', '', '', '', ''],
             ['', '', '', '', '', ''],
             ['', '', '', '', '', ''],
             ['No.', 'Descripción', 'U/M', 'Cantidad', 'Precio CUP', 'Importe'],
             ['1', 'ALMUERZOS PUNTA BRAVA', 'U', normalPuntaBravaDays, '400', normalPuntaBravaDays * 400],
-            ['2', 'COMIDAS', 'U', '', '400', '0'],
+            ['2', 'COMIDAS', 'U', '0', '400', '0'],
             ['3', 'RESFUERZO MEDIO PUNTA BRAVA', 'U', improvedPuntaBravaDays, '500', improvedPuntaBravaDays * 500],
-            ['4', 'MERIENDAS LIGERAS', 'U', '', '200', '0'],
-            ['5', 'TRANSPORTACION', 'U', '', '6', '0'],
+            ['4', 'MERIENDAS LIGERAS', 'U', puntabravaSnacks, '200', puntabravaSnacks * 200],
+            ['5', 'TRANSPORTACION', 'U', '0', '6', '0'],
             ['IMPORTE TOTAL PUNTA BRAVA', '', '', '', '', ''],
             ['', '', '', '', '', ''],
             ['Pagase en CUP en Cuenta Bancaria', '', '', '', '', ''],
@@ -853,7 +885,7 @@ function exportFacturaPuntaBravaExcel() {
         ];
         
         // Calcular el importe total
-        const total = (normalPuntaBravaDays * 400) + (improvedPuntaBravaDays * 500);
+        const total = (normalPuntaBravaDays * 400) + (improvedPuntaBravaDays * 500) + (puntabravaSnacks * 200);
         facturaData[10][5] = total;
         
         const ws = XLSX.utils.aoa_to_sheet(facturaData);
@@ -1065,6 +1097,8 @@ function exportResumenPedidosEmpresa() {
             ['Trabajadores con Estímulo:', workers.filter(w => w.diet === 'estimulo').length],
             ['Total Días Kaniki:', calculateTotalDaysByStore('kaniki')],
             ['Total Días Punta Brava:', calculateTotalDaysByStore('punta_brava')],
+            ['Total Meriendas Kaniki:', calculateSnacksByStore('kaniki')],
+            ['Total Meriendas Punta Brava:', calculateSnacksByStore('punta_brava')],
             ['Total Meriendas:', calculateTotalSnacks()],
             ['Presupuesto Total:', `$${calculateTotalBudget().toFixed(2)}`],
             ['Gasto Total en Alimentos:', `$${calculateTotalFoodExpense().toFixed(2)}`],
@@ -1191,7 +1225,8 @@ function renderWorkers() {
         } else {
             const dailyBudget = dietPrices[worker.diet] || 0;
             const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
-            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+            const totalSnacks = (worker.snacksKaniki || 0) + (worker.snacksPuntaBrava || 0);
+            const snackBudget = totalSnacks * (worker.snackPrice || 50);
             totalBudget = (dailyBudget * totalDays) + snackBudget;
             
             // Mostrar desglose de días por empresa
@@ -1209,6 +1244,7 @@ function renderWorkers() {
         const foodExpense = calculateWorkerFoodExpense(worker);
         const remaining = totalBudget - foodExpense;
         const percentUsed = totalBudget > 0 ? ((foodExpense / totalBudget) * 100) : 0;
+        const totalSnacks = (worker.snacksKaniki || 0) + (worker.snacksPuntaBrava || 0);
         
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -1216,7 +1252,7 @@ function renderWorkers() {
             <td>${worker.surname}</td>
             <td><span class="diet-badge ${worker.diet}">${getDietDisplayName(worker.diet)}</span></td>
             <td>${worker.diet === 'estimulo' ? '-' : `${(worker.kanikiDays || 0) + (worker.puntabravaDays || 0)}`}</td>
-            <td>${worker.diet === 'estimulo' ? '-' : (worker.snacks || 0)}</td>
+            <td>${worker.diet === 'estimulo' ? '-' : totalSnacks}</td>
             <td>${worker.diet === 'estimulo' ? 'Estímulo' : `$${dietPrices[worker.diet] || 0}`}</td>
             <td>
                 <strong>${budgetDisplay}</strong>
@@ -1364,7 +1400,8 @@ function showWorkerDetails(workerId) {
     } else {
         const dailyBudget = dietPrices[worker.diet] || 0;
         const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
-        const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+        const totalSnacks = (worker.snacksKaniki || 0) + (worker.snacksPuntaBrava || 0);
+        const snackBudget = totalSnacks * (worker.snackPrice || 50);
         totalBudget = (dailyBudget * totalDays) + snackBudget;
     }
     
@@ -1387,8 +1424,12 @@ function showWorkerDetails(workerId) {
                 <div class="stat-value">${worker.diet === 'estimulo' ? '-' : (worker.puntabravaDays || 0)}</div>
             </div>
             <div class="stat-item">
-                <div class="stat-label">🍎 Meriendas</div>
-                <div class="stat-value">${worker.diet === 'estimulo' ? '-' : (worker.snacks || 0)}</div>
+                <div class="stat-label">🍎 Meriendas Kaniki</div>
+                <div class="stat-value">${worker.diet === 'estimulo' ? '-' : (worker.snacksKaniki || 0)}</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">🍎 Meriendas Punta Brava</div>
+                <div class="stat-value">${worker.diet === 'estimulo' ? '-' : (worker.snacksPuntaBrava || 0)}</div>
             </div>
             <div class="stat-item">
                 <div class="stat-label">💰 ${worker.diet === 'estimulo' ? 'Estímulo' : 'Precio por Merienda'}</div>
@@ -1496,7 +1537,8 @@ function updateWorkerSummary(worker) {
     } else {
         const dailyBudget = dietPrices[worker.diet] || 0;
         const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
-        const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+        const totalSnacks = (worker.snacksKaniki || 0) + (worker.snacksPuntaBrava || 0);
+        const snackBudget = totalSnacks * (worker.snackPrice || 50);
         totalBudget = (dailyBudget * totalDays) + snackBudget;
     }
     
@@ -1544,7 +1586,8 @@ function updateSummary() {
         } else {
             const dailyBudget = dietPrices[worker.diet] || 0;
             const totalDays = (worker.kanikiDays || 0) + (worker.puntabravaDays || 0);
-            const snackBudget = (worker.snacks || 0) * (worker.snackPrice || 50);
+            const totalSnacks = (worker.snacksKaniki || 0) + (worker.snacksPuntaBrava || 0);
+            const snackBudget = totalSnacks * (worker.snackPrice || 50);
             workerBudget = (dailyBudget * totalDays) + snackBudget;
         }
         
@@ -1648,7 +1691,8 @@ function openWorkerModal(workerId = null) {
                 stimulusField.style.display = 'none';
                 document.getElementById('kaniki-days').value = worker.kanikiDays || 0;
                 document.getElementById('puntabrava-days').value = worker.puntabravaDays || 0;
-                document.getElementById('worker-snacks').value = worker.snacks || 0;
+                document.getElementById('worker-snacks-kaniki').value = worker.snacksKaniki || 0;
+                document.getElementById('worker-snacks-puntabrava').value = worker.snacksPuntaBrava || 0;
                 document.getElementById('snack-price').value = worker.snackPrice || 50;
             }
         }
@@ -1657,7 +1701,8 @@ function openWorkerModal(workerId = null) {
         title.textContent = '➕ Añadir Trabajador';
         form.reset();
         document.getElementById('worker-id').value = '';
-        document.getElementById('worker-snacks').value = 0;
+        document.getElementById('worker-snacks-kaniki').value = 0;
+        document.getElementById('worker-snacks-puntabrava').value = 0;
         document.getElementById('snack-price').value = 50;
         document.getElementById('kaniki-days').value = 0;
         document.getElementById('puntabrava-days').value = 0;
@@ -1699,7 +1744,8 @@ function saveWorker() {
                 // Limpiar campos no utilizados
                 workers[workerIndex].kanikiDays = 0;
                 workers[workerIndex].puntabravaDays = 0;
-                workers[workerIndex].snacks = 0;
+                workers[workerIndex].snacksKaniki = 0;
+                workers[workerIndex].snacksPuntaBrava = 0;
                 workers[workerIndex].snackPrice = 0;
             }
         } else {
@@ -1712,7 +1758,8 @@ function saveWorker() {
                 stimulusBalance: stimulusBalance,
                 kanikiDays: 0,
                 puntabravaDays: 0,
-                snacks: 0,
+                snacksKaniki: 0,
+                snacksPuntaBrava: 0,
                 snackPrice: 0,
                 foods: []
             };
@@ -1722,8 +1769,9 @@ function saveWorker() {
         // Manejo de dietas normales/mejoradas
         const kanikiDays = parseInt(document.getElementById('kaniki-days').value) || 0;
         const puntabravaDays = parseInt(document.getElementById('puntabrava-days').value) || 0;
-        const snacks = parseInt(document.getElementById('worker-snacks').value);
-        const snackPrice = parseFloat(document.getElementById('snack-price').value);
+        const snacksKaniki = parseInt(document.getElementById('worker-snacks-kaniki').value) || 0;
+        const snacksPuntaBrava = parseInt(document.getElementById('worker-snacks-puntabrava').value) || 0;
+        const snackPrice = parseFloat(document.getElementById('snack-price').value) || 50;
         
         if (id) {
             // Editar trabajador existente
@@ -1734,7 +1782,8 @@ function saveWorker() {
                 workers[workerIndex].diet = diet;
                 workers[workerIndex].kanikiDays = kanikiDays;
                 workers[workerIndex].puntabravaDays = puntabravaDays;
-                workers[workerIndex].snacks = snacks;
+                workers[workerIndex].snacksKaniki = snacksKaniki;
+                workers[workerIndex].snacksPuntaBrava = snacksPuntaBrava;
                 workers[workerIndex].snackPrice = snackPrice;
                 // Limpiar campo de estímulo
                 workers[workerIndex].stimulusBalance = 0;
@@ -1748,7 +1797,8 @@ function saveWorker() {
                 diet: diet,
                 kanikiDays: kanikiDays,
                 puntabravaDays: puntabravaDays,
-                snacks: snacks,
+                snacksKaniki: snacksKaniki,
+                snacksPuntaBrava: snacksPuntaBrava,
                 snackPrice: snackPrice,
                 stimulusBalance: 0,
                 foods: []
@@ -2128,7 +2178,6 @@ function exportBackup() {
 // ==================== NUEVAS FUNCIONES PARA ESTÍMULO ====================
 
 // Función para aplicar estímulo a TODOS los trabajadores
-// Función para aplicar estímulo a TODOS los trabajadores
 function applyStimulusToAll() {
     const stimulusAmount = parseFloat(prompt('Ingrese el monto del estímulo para TODOS los trabajadores:', '0'));
     
@@ -2141,11 +2190,12 @@ function applyStimulusToAll() {
         workers.forEach(worker => {
             // Cambiar la dieta a "estimulo" para todos
             worker.diet = 'estimulo';
-            worker.stimulusBalance = stimulusAmount; // CORRECCIÓN: usar stimulusAmount, no stimulusBalance
+            worker.stimulusBalance = stimulusAmount;
             // Limpiar campos de días y meriendas
             worker.kanikiDays = 0;
             worker.puntabravaDays = 0;
-            worker.snacks = 0;
+            worker.snacksKaniki = 0;
+            worker.snacksPuntaBrava = 0;
             worker.snackPrice = 0;
         });
         
@@ -2169,7 +2219,7 @@ function applyStimulusToAll() {
 
 // Configurar event listeners (MODIFICADA)
 function setupEventListeners() {
-       // Tabs
+    // Tabs
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', function() {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -2185,7 +2235,7 @@ function setupEventListeners() {
         openWorkerModal();
     });
     
-    // Botón aplicar estímulo a todos - Asegurar que esté conectado
+    // Botón aplicar estímulo a todos
     document.getElementById('apply-stimulus-btn').addEventListener('click', function() {
         applyStimulusToAll();
     });
@@ -2253,6 +2303,10 @@ function setupEventListeners() {
     document.getElementById('export-factura-puntabrava-btn').addEventListener('click', function() {
         exportFacturaPuntaBravaExcel();
     });
+    
+    // Botones de exportación de productos por tienda (NUEVOS)
+    document.getElementById('export-caniki-excel-btn').addEventListener('click', exportProductosCanikiExcel);
+    document.getElementById('export-puntabrava-excel-btn').addEventListener('click', exportProductosPuntaBravaExcel);
     
     // Botón para exportar resumen de pedidos (versión 2 - desde pestaña Excel)
     document.getElementById('export-resumen-pedidos-btn2').addEventListener('click', function() {
