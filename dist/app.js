@@ -714,6 +714,44 @@ function calculateTotalDaysByStore(store) {
         }, 0);
 }
 
+// ==================== FUNCIONES DE CÁLCULO POR EMPRESA ====================
+
+// Calcular presupuesto por empresa para un trabajador
+function calculateWorkerBudgetByStore(worker, store) {
+    if (worker.diet === 'estimulo') {
+        return 0; // Los de estímulo no tienen presupuesto por empresa
+    }
+    
+    const dailyBudget = dietPrices[worker.diet] || 0;
+    let days = 0;
+    let snacks = 0;
+    
+    if (store === 'kaniki') {
+        days = worker.kanikiDays || 0;
+        snacks = worker.snacksKaniki || 0;
+    } else if (store === 'punta_brava') {
+        days = worker.puntabravaDays || 0;
+        snacks = worker.snacksPuntaBrava || 0;
+    }
+    
+    const snackBudget = snacks * (worker.snackPrice || 50);
+    return (dailyBudget * days) + snackBudget;
+}
+
+// Calcular gasto en alimentos por empresa para un trabajador
+function calculateWorkerFoodExpenseByStore(worker, store) {
+    return worker.foods
+        .filter(food => food.store === store)
+        .reduce((total, food) => total + (food.quantity * food.price), 0);
+}
+
+// Calcular saldo por empresa para un trabajador
+function calculateWorkerRemainingByStore(worker, store) {
+    const budget = calculateWorkerBudgetByStore(worker, store);
+    const expense = calculateWorkerFoodExpenseByStore(worker, store);
+    return budget - expense;
+}
+
 // ==================== FUNCIONES DE EXPORTACIÓN MEJORADAS ====================
 
 // Exportar Factura General MEJORADO
@@ -1194,6 +1232,141 @@ function exportResumenPedidosEmpresa() {
     }
 }
 
+// ==================== NUEVA FUNCIÓN: EXPORTAR PLANTILLA CON DATOS ACTUALES ====================
+
+// Exportar una plantilla Excel con los datos actuales del sistema
+function exportCurrentDataTemplate() {
+    try {
+        // Crear workbook con múltiples hojas
+        const wb = XLSX.utils.book_new();
+        
+        // Hoja 1: Trabajadores actuales
+        const workersData = [
+            ['Nombre', 'Apellidos', 'TipoDieta', 'DiasKaniki', 'DiasPuntaBrava', 'MeriendasKaniki', 'MeriendasPuntaBrava', 'PrecioMerienda', 'Estímulo']
+        ];
+        
+        workers.forEach(worker => {
+            workersData.push([
+                worker.name,
+                worker.surname,
+                worker.diet,
+                worker.diet === 'estimulo' ? '' : (worker.kanikiDays || 0),
+                worker.diet === 'estimulo' ? '' : (worker.puntabravaDays || 0),
+                worker.diet === 'estimulo' ? '' : (worker.snacksKaniki || 0),
+                worker.diet === 'estimulo' ? '' : (worker.snacksPuntaBrava || 0),
+                worker.diet === 'estimulo' ? '' : (worker.snackPrice || 50),
+                worker.diet === 'estimulo' ? (worker.stimulusBalance || 0) : ''
+            ]);
+        });
+        
+        const ws1 = XLSX.utils.aoa_to_sheet(workersData);
+        
+        // Hoja 2: Alimentos actuales
+        const foodsData = [
+            ['Nombre', 'Precio', 'Tienda']
+        ];
+        
+        foodsCatalog.forEach(food => {
+            foodsData.push([
+                food.name,
+                food.price,
+                food.store
+            ]);
+        });
+        
+        const ws2 = XLSX.utils.aoa_to_sheet(foodsData);
+        
+        // Hoja 3: Compras actuales por trabajador
+        const purchasesData = [
+            ['Trabajador', 'Alimento', 'Cantidad', 'Precio Unitario', 'Tienda']
+        ];
+        
+        workers.forEach(worker => {
+            worker.foods.forEach(food => {
+                purchasesData.push([
+                    `${worker.name} ${worker.surname}`,
+                    food.name,
+                    food.quantity,
+                    food.price,
+                    food.store === 'kaniki' ? 'kaniki' : 'punta_brava'
+                ]);
+            });
+        });
+        
+        const ws3 = XLSX.utils.aoa_to_sheet(purchasesData);
+        
+        // Hoja 4: Resumen de configuración
+        const configData = [
+            ['SISTEMA DE GESTIÓN DE ALIMENTACIÓN - PLANTILLA CON DATOS ACTUALES'],
+            ['Fecha de exportación:', new Date().toLocaleDateString()],
+            ['Hora de exportación:', new Date().toLocaleTimeString()],
+            [''],
+            ['CONFIGURACIÓN DEL SISTEMA'],
+            ['Precios por tipo de dieta:'],
+            ['Normal:', '400 $/día'],
+            ['Mejorada:', '500 $/día'],
+            ['Estímulo:', 'Saldo fijo'],
+            [''],
+            ['Nombre de tiendas:'],
+            ['kaniki:', storeNames.kaniki],
+            ['punta_brava:', storeNames.punta_brava],
+            [''],
+            ['ESTADÍSTICAS ACTUALES'],
+            ['Total trabajadores:', workers.length],
+            ['Total alimentos en catálogo:', foodsCatalog.length],
+            ['Trabajadores con dieta normal:', workers.filter(w => w.diet === 'normal').length],
+            ['Trabajadores con dieta mejorada:', workers.filter(w => w.diet === 'mejorada').length],
+            ['Trabajadores con estímulo:', workers.filter(w => w.diet === 'estimulo').length],
+            [''],
+            ['INSTRUCCIONES PARA IMPORTAR:'],
+            ['1. Esta plantilla contiene TODOS los datos actuales del sistema'],
+            ['2. Para restaurar estos datos, importa las hojas "Trabajadores" y "Alimentos"'],
+            ['3. La hoja "Compras" es solo para referencia'],
+            ['4. Los formatos de columna deben mantenerse igual'],
+            ['5. Las tiendas solo pueden ser: "kaniki" o "punta_brava"'],
+            ['6. Las dietas solo pueden ser: "normal", "mejorada" o "estimulo"']
+        ];
+        
+        const ws4 = XLSX.utils.aoa_to_sheet(configData);
+        
+        // Aplicar anchos de columna
+        const ws1Cols = [
+            {wch: 15}, // Nombre
+            {wch: 20}, // Apellidos
+            {wch: 12}, // TipoDieta
+            {wch: 12}, // DiasKaniki
+            {wch: 15}, // DiasPuntaBrava
+            {wch: 15}, // MeriendasKaniki
+            {wch: 18}, // MeriendasPuntaBrava
+            {wch: 14}, // PrecioMerienda
+            {wch: 12}  // Estímulo
+        ];
+        
+        const ws2Cols = [
+            {wch: 25}, // Nombre
+            {wch: 10}, // Precio
+            {wch: 12}  // Tienda
+        ];
+        
+        ws1['!cols'] = ws1Cols;
+        ws2['!cols'] = ws2Cols;
+        
+        // Agregar hojas al workbook
+        XLSX.utils.book_append_sheet(wb, ws1, "Trabajadores");
+        XLSX.utils.book_append_sheet(wb, ws2, "Alimentos");
+        XLSX.utils.book_append_sheet(wb, ws3, "Compras Actuales");
+        XLSX.utils.book_append_sheet(wb, ws4, "Instrucciones");
+        
+        // Escribir el archivo
+        XLSX.writeFile(wb, `Plantilla_Datos_Actuales_${new Date().toISOString().split('T')[0]}.xlsx`);
+        
+        showStatus('✅ Plantilla con datos actuales exportada correctamente', 'success');
+    } catch (error) {
+        console.error('Error exportando plantilla con datos actuales:', error);
+        showStatus('❌ Error al exportar plantilla: ' + error.message, 'error');
+    }
+}
+
 // ==================== FUNCIONES DE INTERFAZ ====================
 
 // Mostrar mensajes de estado
@@ -1380,7 +1553,7 @@ function updateFoodSelect() {
     }
 }
 
-// Mostrar detalles del trabajador CON BOTÓN DE RESET (MODIFICADA)
+// Mostrar detalles del trabajador CON RESUMEN POR EMPRESA (MODIFICADA)
 function showWorkerDetails(workerId) {
     const worker = workers.find(w => w.id === workerId);
     if (!worker) return;
@@ -1408,6 +1581,16 @@ function showWorkerDetails(workerId) {
     const foodExpense = calculateWorkerFoodExpense(worker);
     const remaining = totalBudget - foodExpense;
     const percentUsed = totalBudget > 0 ? ((foodExpense / totalBudget) * 100) : 0;
+    
+    // Calcular por empresa
+    const budgetKaniki = calculateWorkerBudgetByStore(worker, 'kaniki');
+    const budgetPuntaBrava = calculateWorkerBudgetByStore(worker, 'punta_brava');
+    const expenseKaniki = calculateWorkerFoodExpenseByStore(worker, 'kaniki');
+    const expensePuntaBrava = calculateWorkerFoodExpenseByStore(worker, 'punta_brava');
+    const remainingKaniki = budgetKaniki - expenseKaniki;
+    const remainingPuntaBrava = budgetPuntaBrava - expensePuntaBrava;
+    const percentKaniki = budgetKaniki > 0 ? ((expenseKaniki / budgetKaniki) * 100) : 0;
+    const percentPuntaBrava = budgetPuntaBrava > 0 ? ((expensePuntaBrava / budgetPuntaBrava) * 100) : 0;
     
     workerInfo.innerHTML = `
         <div class="worker-header">
@@ -1453,6 +1636,75 @@ function showWorkerDetails(workerId) {
                 <div class="progress-fill" style="width: ${Math.min(percentUsed, 100)}%"></div>
             </div>
         </div>
+        
+        <!-- RESUMEN POR EMPRESA -->
+        ${worker.diet !== 'estimulo' ? `
+        <div class="store-summary-section">
+            <h3>📊 Resumen por Empresa</h3>
+            <div class="store-summary-grid">
+                <div class="store-card kaniki">
+                    <h4>${storeNames.kaniki}</h4>
+                    <div class="store-stats">
+                        <div class="store-stat">
+                            <span>Días:</span>
+                            <span>${worker.kanikiDays || 0}</span>
+                        </div>
+                        <div class="store-stat">
+                            <span>Meriendas:</span>
+                            <span>${worker.snacksKaniki || 0}</span>
+                        </div>
+                        <div class="store-stat">
+                            <span>Presupuesto:</span>
+                            <span>$${budgetKaniki.toFixed(2)}</span>
+                        </div>
+                        <div class="store-stat">
+                            <span>Gasto:</span>
+                            <span>$${expenseKaniki.toFixed(2)}</span>
+                        </div>
+                        <div class="store-stat">
+                            <span>Saldo:</span>
+                            <span class="${remainingKaniki >= 0 ? 'positive' : 'negative'}">$${remainingKaniki.toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar small">
+                        <div class="progress-fill" style="width: ${Math.min(percentKaniki, 100)}%; background-color: ${percentKaniki > 100 ? '#e74c3c' : '#3498db'}"></div>
+                    </div>
+                    <small>${percentKaniki.toFixed(1)}% utilizado</small>
+                </div>
+                
+                <div class="store-card puntabrava">
+                    <h4>${storeNames.punta_brava}</h4>
+                    <div class="store-stats">
+                        <div class="store-stat">
+                            <span>Días:</span>
+                            <span>${worker.puntabravaDays || 0}</span>
+                        </div>
+                        <div class="store-stat">
+                            <span>Meriendas:</span>
+                            <span>${worker.snacksPuntaBrava || 0}</span>
+                        </div>
+                        <div class="store-stat">
+                            <span>Presupuesto:</span>
+                            <span>$${budgetPuntaBrava.toFixed(2)}</span>
+                        </div>
+                        <div class="store-stat">
+                            <span>Gasto:</span>
+                            <span>$${expensePuntaBrava.toFixed(2)}</span>
+                        </div>
+                        <div class="store-stat">
+                            <span>Saldo:</span>
+                            <span class="${remainingPuntaBrava >= 0 ? 'positive' : 'negative'}">$${remainingPuntaBrava.toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar small">
+                        <div class="progress-fill" style="width: ${Math.min(percentPuntaBrava, 100)}%; background-color: ${percentPuntaBrava > 100 ? '#e74c3c' : '#2ecc71'}"></div>
+                    </div>
+                    <small>${percentPuntaBrava.toFixed(1)}% utilizado</small>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+        
         <div class="reset-confirmation" id="reset-confirmation">
             <p><strong>⚠️ ¿Estás seguro de que quieres eliminar TODOS los alimentos de este trabajador?</strong></p>
             <p>Esta acción eliminará ${worker.foods.length} alimentos de la lista.</p>
@@ -2243,6 +2495,11 @@ function setupEventListeners() {
     // Botón añadir alimento al catálogo
     document.getElementById('add-food-catalog-btn').addEventListener('click', function() {
         openFoodCatalogModal();
+    });
+    
+    // Botón exportar plantilla con datos actuales
+    document.getElementById('export-template-btn').addEventListener('click', function() {
+        exportCurrentDataTemplate();
     });
     
     // Formulario trabajador
