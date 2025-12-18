@@ -2204,9 +2204,9 @@ function addFoodToWorker() {
     
     const foodSelect = document.getElementById('food-select');
     const foodId = parseInt(foodSelect.value);
-    const quantity = parseInt(document.getElementById('food-quantity').value);
+    const quantity = document.getElementById('food-quantity').value;
     
-    if (!foodId || !quantity || quantity < 1) {
+    if (!foodId || !quantity) {
         showStatus('❌ Por favor, completa todos los campos correctamente', 'error');
         return;
     }

@@ -1,12 +1,12 @@
 :root {
-    --primary-color: #2c3e50;
+    --primary-color: #09086E;
     --secondary-color: #3498db;
     --accent-color: #e74c3c;
     --light-color: #ecf0f1;
     --dark-color: #34495e;
-    --success-color: #27ae60;
+    --success-color: #09086E;
     --warning-color: #f39c12;
-    --excel-color: #217346;
+    --excel-color: #09086E;
     --info-color: #17a2b8;
     --kaniki-color: #3498db;
     --puntabrava-color: #2ecc71;
@@ -40,12 +40,14 @@ body {
 }
 
 header {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
     color: white;
     padding: 30px;
     text-align: center;
     border-radius: 12px 12px 0 0;
     margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
 }
 
 header h1 {
@@ -57,12 +59,11 @@ header h1 {
     gap: 15px;
 }
 
-header p {
-    font-size: 1.1rem;
-    opacity: 0.9;
+header img {
+   height: 90px;
 }
 
-h1, h2, h3 {
+h2, h3 {
     margin-bottom: 15px;
     color: var(--primary-color);
 }
@@ -199,7 +200,7 @@ button:hover {
 }
 
 .btn-success:hover {
-    background-color: #219653;
+    background-color: var(--secondary-color);
 }
 
 .btn-excel {
@@ -207,7 +208,7 @@ button:hover {
 }
 
 .btn-excel:hover {
-    background-color: #1a5c38;
+    background-color: var(--secondary-color);
 }
 
 .btn-info {
@@ -241,7 +242,7 @@ button:hover {
 
 .total-row td {
     font-size: 1.1em;
-    color: var(--primary-color);
+    color: var(--secondary-color);
 }
 
 .summary {
